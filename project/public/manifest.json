@@ -1,0 +1,18 @@
+{
+  "name": "SwasthLink - Telemedicine Platform",
+  "short_name": "SwasthLink",
+  "description": "Low-bandwidth optimized telemedicine platform for rural healthcare",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "vite.svg",
+      "sizes": "32x32",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="SwasthLink - Low-bandwidth optimized telemedicine platform for rural healthcare" />
+    <meta name="theme-color" content="#ffffff" />
+    
+    <!-- Performance and optimization meta tags -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="SwasthLink" />
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/src/main.jsx" as="script" />
+    <link rel="preload" href="/src/index.css" as="style" />
+    
+    <!-- DNS prefetch for external resources -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+    
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Apple PWA meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SwasthLink" />
+    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    
+    <!-- Microsoft PWA meta tags -->
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    
+    <title>SwasthLink - Telemedicine Platform</title>
+    
+    <!-- Remove no-js class immediately -->
+    <script>
+      document.documentElement.classList.remove('no-js');
+      document.documentElement.classList.add('js');
+    </script>
+    
+    <!-- Critical CSS will be inlined here during build -->
+    <style>
+      /* Critical above-the-fold styles */
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: #ffffff;
+      }
+      
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-size: 18px;
+        color: #0369a1;
+      }
+      
+      /* No-JS fallback styles */
+      .no-js .js-only {
+        display: none !important;
+      }
+      
+      .no-js .no-js-fallback {
+        display: block !important;
+      }
+      
+      /* Progressive enhancement base styles */
+      .lazy-image {
+        transition: opacity 0.3s ease;
+      }
+      
+      .lazy-image.loading {
+        opacity: 0.7;
+        filter: blur(2px);
+      }
+      
+      .lazy-image.loaded {
+        opacity: 1;
+        filter: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="loading">Loading SwasthLink...</div>
+    </div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
