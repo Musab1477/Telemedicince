@@ -39,9 +39,9 @@ def login_user(request):
         return Response({"message": "User not found"}, status=404)
 
     # 🔐 Doctor / Hospital → password required
-    if user.role in ["doctor", "hospital"]:
-        if not password:
-            return Response({"message": "Password required"}, status=400)
+    if password:
+        if user.role not in ["doctor", "hospital"]:
+            return Response({"message": "Password login not allowed for this user role"}, status=400)
         
         if user.status == "pending":
             return Response({"message": "Your account is still pending approval"}, status=403)
@@ -72,7 +72,7 @@ def login_user(request):
 @permission_classes([AllowAny])
 def verify_otp_and_login(request):
     """
-    Step-2 OTP verification & JWT issue (Redis based)
+    Step-2 OTP verification & JWT issue
     """
 
     user_id = request.data.get("user_id")
@@ -84,24 +84,27 @@ def verify_otp_and_login(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Verify OTP from Redis
-    success, message = verify_otp_from_redis(user_id, otp_entered)
-    
-    if not success:
+    try:
+        otp_obj = OTP.objects.filter(user_id=user_id).latest("created_at")
+    except OTP.DoesNotExist:
         return Response(
-            {"message": message},
+            {"message": "OTP not found"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Get user and generate tokens
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
+    if otp_obj.is_expired():
         return Response(
-            {"message": "User not found"},
-            status=status.HTTP_404_NOT_FOUND
+            {"message": "OTP expired"},
+            status=status.HTTP_400_BAD_REQUEST
         )
 
+    if otp_obj.otp != otp_entered:
+        return Response(
+            {"message": "Invalid OTP"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user = otp_obj.user
     tokens = get_tokens_for_user(user)
 
     return Response(
