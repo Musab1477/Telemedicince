@@ -3,8 +3,10 @@ import { route } from 'preact-router'
 import { OTPVerification } from '../../ui/OTPInput'
 import GoogleTranslate from '../../GoogleTranslate'
 import api from '../../../utils/api'
+import { useAuth } from '../../../contexts/AuthContext'
 
 export function PatientLogin() {
+  const { login } = useAuth()
   const [phone, setPhone] = useState('')
   const [step, setStep] = useState(1) // 1 = enter phone, 2 = verify otp
   const [isLoading, setIsLoading] = useState(false)
@@ -89,8 +91,15 @@ export function PatientLogin() {
       // Store tokens in localStorage
       localStorage.setItem('accessToken', response.tokens.access)
       localStorage.setItem('refreshToken', response.tokens.refresh)
-      localStorage.setItem('user', JSON.stringify(response.user))
       localStorage.setItem('isAuthenticated', 'true')
+
+      // ✅ Use AuthContext login to properly set user state
+      const userData = {
+        ...response.user,
+        role: 'patient'  // Ensure role is set
+      }
+      login(userData)
+      console.log('✅ User saved to AuthContext:', userData)
 
       // Clear pending login data
       localStorage.removeItem('pendingUserId')

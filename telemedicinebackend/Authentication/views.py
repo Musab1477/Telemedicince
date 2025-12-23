@@ -52,7 +52,7 @@ def login_user(request):
     OTP.objects.create(user=user, otp=otp_code)
 
     # 📲 SEND OTP VIA TWILIO (DEV MODE)
-    send_otp_twilio(otp_code)
+    send_otp_twilio(otp_code, mobile_number)
 
     return Response(
         {

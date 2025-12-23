@@ -6,7 +6,7 @@ import random
 def generate_otp():
     return str(random.randint(100000, 999999))
 
-def send_otp_twilio(otp):
+def send_otp_twilio(otp, phone):
     """
     DEV MODE:
     OTP hamesha verified number par jayega
@@ -19,7 +19,7 @@ def send_otp_twilio(otp):
     message = client.messages.create(
         body=f"Your login OTP is {otp}",
         from_=settings.TWILIO_PHONE_NUMBER,
-        to="+919327190573"  # 👈 VERIFIED NUMBER ONLY
+        to=phone # 👈 VERIFIED NUMBER ONLY
     )
 
     return message.sid
