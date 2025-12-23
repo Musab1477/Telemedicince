@@ -6,11 +6,10 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import login, logout
 from .models import *
-from .models import OTP
 from rest_framework.permissions import IsAuthenticated
 from .serializers import *
 from django.db import IntegrityError
-from .utils import generate_otp, send_otp_twilio
+from .utils import generate_otp, send_otp_twilio, store_otp_in_redis, verify_otp_from_redis
 from rest_framework.parsers import MultiPartParser, FormParser
 
 def get_tokens_for_user(user):
@@ -43,13 +42,19 @@ def login_user(request):
     if user.role in ["doctor", "hospital"]:
         if not password:
             return Response({"message": "Password required"}, status=400)
+        
+        if user.status == "pending":
+            return Response({"message": "Your account is still pending approval"}, status=403)
+        
+        if user.status == "rejected":
+            return Response({"message": "Your account registration was rejected"}, status=403)
 
         if not user.check_password(password):
             return Response({"message": "Invalid password"}, status=401)
 
-    # 🔑 Generate OTP
+    # 🔑 Generate OTP and store in Redis
     otp_code = generate_otp()
-    OTP.objects.create(user=user, otp=otp_code)
+    store_otp_in_redis(user.id, otp_code)
 
     # 📲 SEND OTP VIA TWILIO (DEV MODE)
     send_otp_twilio(otp_code, mobile_number)
@@ -67,7 +72,7 @@ def login_user(request):
 @permission_classes([AllowAny])
 def verify_otp_and_login(request):
     """
-    Step-2 OTP verification & JWT issue
+    Step-2 OTP verification & JWT issue (Redis based)
     """
 
     user_id = request.data.get("user_id")
@@ -79,27 +84,24 @@ def verify_otp_and_login(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # Verify OTP from Redis
+    success, message = verify_otp_from_redis(user_id, otp_entered)
+    
+    if not success:
+        return Response(
+            {"message": message},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Get user and generate tokens
     try:
-        otp_obj = OTP.objects.filter(user_id=user_id).latest("created_at")
-    except OTP.DoesNotExist:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
         return Response(
-            {"message": "OTP not found"},
-            status=status.HTTP_400_BAD_REQUEST
+            {"message": "User not found"},
+            status=status.HTTP_404_NOT_FOUND
         )
 
-    if otp_obj.is_expired():
-        return Response(
-            {"message": "OTP expired"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    if otp_obj.otp != otp_entered:
-        return Response(
-            {"message": "Invalid OTP"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    user = otp_obj.user
     tokens = get_tokens_for_user(user)
 
     return Response(
@@ -218,17 +220,7 @@ def create_doctor_user(request):
 
         return Response(
             {
-                "message": "Doctor registered successfully",
-                "doctor": {
-                    "id": doctor.id,
-                    "first_name": doctor.first_name,
-                    "last_name": doctor.last_name,
-                    "mobile_number": doctor.mobile_number,
-                    "email": doctor.email,
-                    "role": doctor.role,
-                },
-                # ⚠️ DEV MODE ONLY
-                "generated_password": generated_password,
+                "message": "You will recieve an email once your account is approved by admin",
             },
             status=status.HTTP_201_CREATED
         )

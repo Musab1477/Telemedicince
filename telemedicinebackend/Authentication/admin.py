@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
+from django.utils.html import format_html
 from .models import *
 
 
@@ -11,14 +12,17 @@ class UserAdmin(BaseUserAdmin):
     list_display = (
         "id",
         "username",
+        "first_name",
         "mobile_number",
+        "email",
         "role",
-        "hospital_name",
+        "status_badge",
         "is_active",
-        "is_staff",
+        "created_at",
     )
 
     list_filter = (
+        "status",
         "role",
         "gender",
         "hospital_type",
@@ -32,12 +36,16 @@ class UserAdmin(BaseUserAdmin):
         "mobile_number",
         "first_name",
         "last_name",
+        "email",
         "hospital_name",
         "doctor_license_number",
         "registration_number",
     )
 
-    ordering = ("id",)
+    ordering = ("-created_at",)
+    
+    # Per page
+    list_per_page = 25
 
     readonly_fields = (
         "last_login",
@@ -45,6 +53,62 @@ class UserAdmin(BaseUserAdmin):
         "created_at",
         "updated_at",
     )
+    
+    # ------------------ ACTIONS FOR BULK APPROVE/REJECT ----------------------
+    actions = ["approve_users", "reject_users", "mark_pending"]
+    
+    @admin.action(description="✅ Approve selected users")
+    def approve_users(self, request, queryset):
+        count = queryset.update(status="approved")
+        # Send emails for each user
+        for user in queryset:
+            from .email_service import send_status_email
+            send_status_email(user, "approved")
+        self.message_user(request, f"✅ {count} user(s) approved successfully!")
+    
+    @admin.action(description="❌ Reject selected users")
+    def reject_users(self, request, queryset):
+        count = queryset.update(status="rejected")
+        # Send emails for each user
+        for user in queryset:
+            from .email_service import send_status_email
+            send_status_email(user, "rejected")
+        self.message_user(request, f"❌ {count} user(s) rejected!")
+    
+    @admin.action(description="⏳ Mark as Pending")
+    def mark_pending(self, request, queryset):
+        count = queryset.update(status="pending")
+        self.message_user(request, f"⏳ {count} user(s) marked as pending!")
+    
+    # ------------------ STATUS BADGE DISPLAY ----------------------
+    @admin.display(description="Status")
+    def status_badge(self, obj):
+        if obj.status == "approved":
+            return format_html(
+                '<span style="background-color: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;">✓ Approved</span>'
+            )
+        elif obj.status == "rejected":
+            return format_html(
+                '<span style="background-color: #ef4444; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;">✕ Rejected</span>'
+            )
+        elif obj.status == "pending":
+            return format_html(
+                '<span style="background-color: #f59e0b; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;">⏳ Pending</span>'
+            )
+        else:
+            return format_html(
+                '<span style="background-color: #6b7280; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;">— Not Set</span>'
+            )
+    
+    # ------------------ DEFAULT FILTER: SHOW DOCTORS ONLY ----------------------
+    def changelist_view(self, request, extra_context=None):
+        # If no role filter is applied, default to showing doctors
+        if 'role__exact' not in request.GET and 'role' not in request.GET:
+            q = request.GET.copy()
+            q['role__exact'] = 'doctor'
+            request.GET = q
+            request.META['QUERY_STRING'] = request.GET.urlencode()
+        return super().changelist_view(request, extra_context=extra_context)
 
     # ------------------ FIELDSETS (EDIT USER PAGE) ----------------------
 
@@ -68,9 +132,10 @@ class UserAdmin(BaseUserAdmin):
             )
         }),
 
-        (_("Role Information"), {
+        (_("Role & Status"), {
             "fields": (
                 "role",
+                "status",
             )
         }),
 

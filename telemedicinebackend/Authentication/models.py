@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 
 def degree_upload_path(instance, filename):
@@ -135,7 +137,13 @@ class User(AbstractUser):
     updated_at = models.DateTimeField(
         auto_now=True
     )
-
+    
+    status = models.CharField(
+        max_length=20,
+        choices=[("pending", "Pending"), ("approved", "Approved"), ("rejected", "Rejected")],
+        default="pending"
+    )
+    
     def __str__(self):
         return f"{self.username} - {self.role}"
 
@@ -150,4 +158,26 @@ class OTP(models.Model):
 
     def is_expired(self):
         return (timezone.now() - self.created_at).seconds > 300  # 5 min
+
+
+# Signal to send email when status changes
+@receiver(pre_save, sender=User)
+def send_status_change_email(sender, instance, **kwargs):
+    """
+    Send email when user status changes to 'approved' or 'rejected'
+    """
+    if instance.pk:  # Only for existing users (not new registrations)
+        try:
+            old_user = User.objects.get(pk=instance.pk)
+            old_status = old_user.status
+            new_status = instance.status
+            
+            # Check if status actually changed
+            if old_status != new_status and new_status in ['approved', 'rejected']:
+                # Import here to avoid circular imports
+                from .email_service import send_status_email
+                send_status_email(instance, new_status)
+                print(f"Status changed from '{old_status}' to '{new_status}' for user {instance.username}")
+        except User.DoesNotExist:
+            pass  # New user, ignore
 
