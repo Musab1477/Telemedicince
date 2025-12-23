@@ -22,6 +22,7 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
+IBM_API_KEY = os.getenv("IBM_API_KEY")
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -69,6 +70,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'agent',
     'Authentication',
     'corsheaders',
     'rest_framework',
@@ -141,7 +143,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'telemedicine',    # database name
         'USER': 'root',          # mysql user
-        'PASSWORD': 'Mus@b1477',  # mysql password
+        'PASSWORD': 'ayan@123',  # mysql password
         'HOST': 'localhost',
         'PORT': '3306',
         'OPTIONS': {

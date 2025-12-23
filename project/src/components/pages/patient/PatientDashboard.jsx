@@ -1,5 +1,5 @@
 import { route } from 'preact-router'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth, USER_ROLES } from '../../../contexts/AuthContext'
 import { useTranslation } from '../../../contexts/I18nContext'
 import { useState, useEffect } from 'preact/hooks'
 import GoogleTranslate from '../../../components/GoogleTranslate'
@@ -7,7 +7,7 @@ import api from '../../../utils/api'
 
 export function PatientDashboard() {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { user, login } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDark, setIsDark] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -45,8 +45,14 @@ export function PatientDashboard() {
       console.log('Mobile Number:', response.mobile_number)
 
       setProfileData(response)
-      // Update user in localStorage
-      localStorage.setItem('user', JSON.stringify(response))
+      
+      // ✅ Update AuthContext with fetched profile data
+      const userData = {
+        ...response,
+        role: response.role || USER_ROLES.PATIENT
+      }
+      login(userData)
+      console.log('✅ User updated in AuthContext:', userData)
     } catch (err) {
       console.error('❌ Profile Fetch Error:', err)
       console.error('Error Status:', err.status)

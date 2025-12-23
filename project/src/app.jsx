@@ -56,10 +56,13 @@ import DoctorProfileSelf from './components/pages/doctor/DoctorProfile'
 import HospitalDetails from './components/pages/patient/HospitalDetails'
 import { SideBar } from './components/ui/SideBar'
 import FormBuilder from './components/pages/hospital/FormBuilder'
+import N8nChatLoader from './components/pages/patient/N8nChatLoader'
+
 
 export function App() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <N8nChatLoader />
       <Router>
         <Route path="/" component={HomePage} />
         <Route path="/navbar" component={NavBar} />
