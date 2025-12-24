@@ -25,6 +25,7 @@ urlpatterns = [
     path('profile/', profile_view, name="profile_view"),
     path('create-patient/', create_patient_user, name="create_patient_user"),
     path('create-doctor/', create_doctor_user, name="create_doctor_user"),
+    path('get-doctor-list/', get_doctor_users, name="get_doctor_list"),
     path('create-hospital/', create_hospital_user, name="create_hospital_user"),
     path('verify-otp/', verify_otp_and_login, name="verify_otp"),
 ]

@@ -1,53 +1,13 @@
 import { useState, useEffect } from 'preact/hooks'
 import { route } from 'preact-router'
 
-// Small mock - mirrors ConsultationRoom's mock shape and localStorage key 'mock_consultations'
-const DEFAULT_MOCK = {
-  apt_001: {
-    id: 'apt_001',
-    patient: { id: 'pat_001', name: 'Priya Sharma', age: 28, gender: 'Female' },
-    appointmentTime: '09:00 AM',
-    symptoms: 'Fever and headache for 3 days',
-    urgency: 'medium',
-    type: 'video',
-    status: 'scheduled'
-  },
-  apt_002: {
-    id: 'apt_002',
-    patient: { id: 'pat_002', name: 'Rajesh Kumar', age: 45, gender: 'Male' },
-    appointmentTime: '10:30 AM',
-    symptoms: 'Chest pain and shortness of breath',
-    urgency: 'high',
-    type: 'audio',
-    status: 'in_progress'
-  },
-  apt_003: {
-    id: 'apt_003',
-    patient: { id: 'pat_003', name: 'John Doe', age: 50, gender: 'Male' },
-    appointmentTime: 'Yesterday',
-    symptoms: 'Follow-up',
-    urgency: 'low',
-    type: 'video',
-    status: 'completed',
-    endedAt: new Date(Date.now() - 3600 * 1000).toISOString(),
-    durationSeconds: 600
-  },
-    apt_004: {
-      id: 'apt_004',
-      patient: { id: 'pat_004', name: 'Anita Deshpande', age: 34, gender: 'Female' },
-      appointmentTime: '11:15 AM',
-      symptoms: 'Skin rash and itching',
-      urgency: 'low',
-      type: 'video',
-      status: 'scheduled'
-    }
-}
-
 export default function ConsultationList() {
-  const [filter, setFilter] = useState('upcoming') // upcoming | completed | all
+  const [filter, setFilter] = useState('upcoming') // upcoming | completed | cancelled | all
   const [consultations, setConsultations] = useState([])
   const [isDark, setIsDark] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     const darkMode = localStorage.getItem('darkMode') === 'true'
@@ -58,6 +18,96 @@ export default function ConsultationList() {
       document.documentElement.classList.remove('dark')
     }
   }, [])
+
+  // Fetch appointments from API
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const token = localStorage.getItem('accessToken')
+        if (!token) {
+          setError('Please login to view appointments')
+          setLoading(false)
+          return
+        }
+
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+        const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+        
+        // Determine status parameter based on filter
+        const statusMap = {
+          'upcoming': 'upcoming',
+          'completed': 'completed',
+          'cancelled': 'cancelled',
+          'all': 'all'
+        }
+        
+        const status = statusMap[filter] || 'all'
+        const url = `${apiUrl}patient/appointments/list/?status=${status}`
+        
+        console.log('📡 Fetching appointments from:', url)
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        console.log('📥 Response Status:', response.status)
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('❌ Failed to fetch appointments:', errorData)
+          throw new Error(errorData.detail || 'Failed to fetch appointments')
+        }
+
+        const data = await response.json()
+        console.log('✅ Appointments received:', data)
+        
+        // Map API response to component format
+        // API returns: { appointments: [...], count, message, status_filter }
+        const appointmentsArray = Array.isArray(data) ? data : (data.appointments || [])
+        console.log('📋 Appointments array:', appointmentsArray)
+        
+        const mappedAppointments = appointmentsArray.map(apt => {
+          console.log('🔄 Mapping appointment:', apt)
+          return {
+            id: apt.id.toString(),
+            patient: {
+              id: apt.patient,
+              name: apt.patient_name
+            },
+            appointmentTime: `${apt.appointment_date} ${apt.start_time}`,
+            appointmentDate: apt.appointment_date,
+            startTime: apt.start_time,
+            endTime: apt.end_time,
+            symptoms: 'General Checkup',
+            urgency: apt.status === 'booked' ? 'high' : apt.status === 'completed' ? 'low' : 'medium',
+            type: 'video',
+            status: apt.status === 'booked' ? 'scheduled' : apt.status === 'completed' ? 'completed' : 'cancelled',
+            paymentStatus: apt.payment_status,
+            amount: apt.amount,
+            doctorUrl: apt.doctor_link
+          }
+        })
+        
+        console.log('✅ Mapped appointments:', mappedAppointments)
+        setConsultations(mappedAppointments)
+      } catch (err) {
+        console.error('❌ Error fetching appointments:', err)
+        setError(err.message)
+        setConsultations([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAppointments()
+  }, [filter])
 
   const toggleDarkMode = () => {
     const newDarkMode = !isDark
@@ -78,53 +128,8 @@ export default function ConsultationList() {
     { icon: '🎥', label: 'Consultations', active: true, onClick: () => {} },
   ]
 
-  useEffect(() => {
-    // load from localStorage if present, else fallback to DEFAULT_MOCK
-    let loaded = {}
-    try {
-      const raw = localStorage.getItem('mock_consultations')
-      if (raw) {
-        loaded = JSON.parse(raw)
-      } else {
-        loaded = DEFAULT_MOCK
-      }
-    } catch (e) {
-      loaded = DEFAULT_MOCK
-    }
+  // Removed old useEffect that loads from localStorage - now using API
 
-    // if loaded is an empty object, seed with defaults so there are upcoming items for testing
-    if (!loaded || Object.keys(loaded).length === 0) {
-      loaded = DEFAULT_MOCK
-      try {
-        localStorage.setItem('mock_consultations', JSON.stringify(DEFAULT_MOCK))
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    const arr = Object.keys(loaded).map(id => ({ id, ...loaded[id] }))
-      .sort((a, b) => (a.status === 'in_progress' ? -1 : 0))
-
-    // If there are no upcoming consultations (scheduled/in_progress), merge in defaults
-    const upcomingCount = arr.filter(c => c.status === 'scheduled' || c.status === 'in_progress').length
-    if (upcomingCount === 0) {
-      // merge DEFAULT_MOCK scheduled/in_progress items
-      const defaults = Object.keys(DEFAULT_MOCK).map(id => ({ id, ...DEFAULT_MOCK[id] }))
-      const toAdd = defaults.filter(d => d.status === 'scheduled' || d.status === 'in_progress')
-      if (toAdd.length > 0) {
-        // add them and persist
-        const mergedObj = { ...loaded }
-        toAdd.forEach(item => { mergedObj[item.id] = { ...item, id: item.id } })
-        try { localStorage.setItem('mock_consultations', JSON.stringify(mergedObj)) } catch (e) {}
-        const mergedArr = Object.keys(mergedObj).map(id => ({ id, ...mergedObj[id] }))
-          .sort((a, b) => (a.status === 'in_progress' ? -1 : 0))
-        setConsultations(mergedArr)
-        return
-      }
-    }
-
-    setConsultations(arr)
-  }, [])
 
   // (No helper buttons in the UI - initial seeding happens in useEffect)
 
@@ -262,6 +267,16 @@ export default function ConsultationList() {
                   ✅ Completed
                 </button>
                 <button 
+                  onClick={() => setFilter('cancelled')} 
+                  className={`px-6 py-2 rounded-lg font-medium transition-all transform hover:scale-105 ${
+                    filter==='cancelled'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  ❌ Cancelled
+                </button>
+                <button 
                   onClick={() => setFilter('all')} 
                   className={`px-6 py-2 rounded-lg font-medium transition-all transform hover:scale-105 ${
                     filter==='all'
@@ -275,7 +290,19 @@ export default function ConsultationList() {
             </div>
 
             {/* Consultations List */}
-            {filtered.length === 0 ? (
+            {loading ? (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-8 text-center">
+                <div className="text-gray-400 dark:text-gray-600 text-6xl mb-4 animate-spin">⏳</div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading appointments...</h3>
+                <p className="text-gray-600 dark:text-gray-400">Fetching from server</p>
+              </div>
+            ) : error ? (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-red-200 dark:border-red-800 shadow-sm p-8 text-center">
+                <div className="text-red-400 text-6xl mb-4">⚠️</div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Error loading appointments</h3>
+                <p className="text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-8 text-center">
                 <div className="text-gray-400 dark:text-gray-600 text-6xl mb-4">🎥</div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No consultations</h3>
@@ -284,19 +311,15 @@ export default function ConsultationList() {
             ) : (
               <div className="space-y-4">
                 {filtered.map(item => {
-                  const urgencyColors = {
-                    high: 'from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-red-300 dark:border-red-800',
-                    medium: 'from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-yellow-300 dark:border-yellow-800',
-                    low: 'from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-300 dark:border-green-800'
-                  }
                   const statusColors = {
                     scheduled: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400',
                     in_progress: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400',
-                    completed: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+                    completed: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300',
+                    cancelled: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
                   }
                   
                   return (
-                    <div key={item.id} className={`bg-gradient-to-r ${urgencyColors[item.urgency] || 'from-white to-gray-50 dark:from-gray-800 dark:to-gray-800/50'} rounded-2xl border-2 shadow-sm p-4 sm:p-6 hover:shadow-lg transition-all`}>
+                    <div key={item.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 sm:p-6 hover:shadow-lg transition-all">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-start gap-4">
                           <div className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
@@ -309,38 +332,42 @@ export default function ConsultationList() {
                                 {item.status === 'in_progress' ? 'In Progress' : item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                              <span className="flex items-center gap-1">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {item.appointmentTime || new Date(item.endedAt).toLocaleString() || ''}
-                              </span>
-                              <span>•</span>
-                              <span className="capitalize">{item.type === 'video' ? '📹 Video' : '🎙️ Audio'}</span>
-                            </div>
-                            <div className="flex items-start gap-2 text-sm">
-                              <span className="text-purple-600 dark:text-purple-400 font-medium">💬 Symptoms:</span>
-                              <span className="text-gray-700 dark:text-gray-300">{item.symptoms}</span>
-                            </div>
-                            {item.urgency && (
-                              <div className="mt-2">
-                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                                  item.urgency === 'high' ? 'bg-red-500/20 text-red-700 dark:text-red-400 border border-red-500' :
-                                  item.urgency === 'medium' ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border border-yellow-500' :
-                                  'bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500'
-                                }`}>
-                                  {item.urgency === 'high' ? '🔴' : item.urgency === 'medium' ? '🟡' : '🟢'}
-                                  <span className="ml-1 capitalize">{item.urgency} Priority</span>
+                            <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">📅 Date:</span>
+                                <span>{item.appointmentDate}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">⏱️ Start Time:</span>
+                                <span>{item.startTime}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">⏹️ End Time:</span>
+                                <span>{item.endTime}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">💬 Symptoms:</span>
+                                <span>{item.symptoms}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 dark:text-gray-300">💳 Payment:</span>
+                                <span className="inline-flex items-center px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded text-xs font-semibold">
+                                  {item.paymentStatus.toUpperCase()} • ₹{item.amount}
                                 </span>
                               </div>
-                            )}
+                            </div>
                           </div>
                         </div>
                         <div className="flex sm:flex-col gap-2">
-                          {item.status !== 'completed' ? (
+                          {item.status !== 'completed' && item.status !== 'cancelled' ? (
                             <button 
-                              onClick={() => handleJoin(item.id)} 
+                              onClick={() => {
+                                if (item.doctorUrl) {
+                                  window.location.href = item.doctorUrl
+                                } else {
+                                  alert('Consultation link not available')
+                                }
+                              }} 
                               className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-xl font-medium transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 whitespace-nowrap"
                             >
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

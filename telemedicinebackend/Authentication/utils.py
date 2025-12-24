@@ -1,7 +1,9 @@
 from twilio.rest import Client
+from twilio.http.http_client import TwilioHttpClient
 from django.conf import settings
-import redis
 import random
+
+import redis
 
 # Redis connection
 def get_redis_client():

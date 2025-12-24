@@ -60,7 +60,9 @@ class CreateDoctorSerializer(serializers.ModelSerializer):
             "years_of_experience",
             "highest_qualification",
             "current_hospital",
-
+            "hospital_type",
+            "hospital_address",
+            "consultation_fee",
             "degree_document",
             "other_certificate_document",
             "medical_license_document",
@@ -89,6 +91,35 @@ class CreateDoctorSerializer(serializers.ModelSerializer):
         self.context["generated_password"] = raw_password
 
         return user
+    
+class DoctorListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "mobile_number",
+            "email",
+            "role",
+            "consultation_fee",
+            "hospital_type",
+            "hospital_address",
+            "doctor_license_number",
+            "specialization",
+            "years_of_experience",
+            "highest_qualification",
+            "current_hospital",
+
+            "degree_document",
+            "other_certificate_document",
+            "medical_license_document",
+            "address_proof_document",
+            "digital_signature_certificate",
+
+            "created_at",
+        )
+
     
 class CreateHospitalSerializer(serializers.ModelSerializer):
 

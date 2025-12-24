@@ -150,6 +150,7 @@ class UserAdmin(BaseUserAdmin):
                 "other_certificate_document",
                 "medical_license_document",
                 "digital_signature_certificate",
+                "consultation_fee",
             ),
             "classes": ("collapse",),
         }),

@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useState, useEffect } from 'preact/hooks'
 import { route } from 'preact-router'
 import { PatientLayout } from '../../ui/PatientLayout'
 
@@ -6,6 +6,15 @@ export function SearchDoctor() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSpecialty, setSelectedSpecialty] = useState('')
   const [typeFilter, setTypeFilter] = useState('') // individual | government | private | semi
+
+  // API state
+  const [doctors, setDoctors] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [specialties, setSpecialties] = useState(['General Medicine', 'Pediatrics', 'Cardiology', 'Dermatology', 'Orthopedics'])
 
   // Detect single-hospital mode via query param (hospitalId preferred)
   let singleHospital = false
@@ -21,104 +30,102 @@ export function SearchDoctor() {
     // ignore
   }
 
-  // Expanded mock doctors (ids as string keys to match doctor profile keys)
-  const mockDoctors = [
-    {
-      id: 'd1',
-      name: 'Dr. Rajesh Kumar',
-      specialty: 'General Medicine',
-      hospital: 'City General Hospital',
-      area: 'Central',
-      diseases: ['diabetes', 'hypertension'],
-      type: 'government',
-      experience: '15 years',
-      rating: 4.5,
-      fee: 300,
-      nextSlot: '10:00 AM',
-      distance: '2.5 km'
-    },
-    {
-      id: 'd2',
-      name: 'Dr. Anjali Mehta',
-      specialty: 'Pediatrics',
-      hospital: 'City General Hospital',
-      area: 'Central',
-      diseases: ['fever', 'infections'],
-      type: 'government',
-      experience: '10 years',
-      rating: 4.6,
-      fee: 350,
-      nextSlot: '2:00 PM',
-      distance: '2.6 km'
-    },
-    {
-      id: 'd3',
-      name: 'Dr. Priya Sharma',
-      specialty: 'Cardiology',
-      hospital: 'Apollo Clinic',
-      area: 'Park Avenue',
-      diseases: ['heart disease'],
-      type: 'private',
-      experience: '8 years',
-      rating: 4.7,
-      fee: 400,
-      nextSlot: '4:30 PM',
-      distance: '3.8 km'
-    },
-    {
-      id: 'd4',
-      name: 'Dr. Suresh Patil',
-      specialty: 'General Medicine',
-      hospital: 'Rural Health Center',
-      area: 'Northside',
-      diseases: ['malaria'],
-      type: 'government',
-      experience: '12 years',
-      rating: 4.0,
-      fee: 250,
-      nextSlot: '11:00 AM',
-      distance: '5.2 km'
-    },
-    {
-      id: 'd5',
-      name: 'Dr. Vikram Joshi',
-      specialty: 'Orthopedics',
-      hospital: 'Apollo Clinic',
-      area: 'Park Avenue',
-      diseases: ['fracture'],
-      type: 'private',
-      experience: '9 years',
-      rating: 4.4,
-      fee: 380,
-      nextSlot: '3:00 PM',
-      distance: '3.8 km'
+  // Fetch doctors from API
+  const fetchDoctors = async (page = 1, search = '') => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) {
+      console.error('No auth token found')
+      return
     }
-  ]
 
-  const specialties = ['General Medicine', 'Pediatrics', 'Cardiology', 'Dermatology', 'Orthopedics']
+    setIsLoading(true)
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+      
+      let url = `${baseUrl}auth/get-doctor-list/?page=${page}&per_page=${perPage}`
+      if (search.trim()) {
+        url += `&search=${encodeURIComponent(search.trim())}`
+      }
 
-  const filteredDoctors = mockDoctors.filter(doctor => {
-    const q = searchTerm.trim().toLowerCase()
-    const matchesSearch = !q || (
-      doctor.name.toLowerCase().includes(q) ||
-      doctor.specialty.toLowerCase().includes(q) ||
-      (doctor.hospital && doctor.hospital.toLowerCase().includes(q)) ||
-      (doctor.area && doctor.area.toLowerCase().includes(q)) ||
-      (doctor.diseases && doctor.diseases.join(' ').toLowerCase().includes(q))
-    )
-    const matchesSpecialty = !selectedSpecialty || doctor.specialty === selectedSpecialty
-    const matchesType = !typeFilter || doctor.type === typeFilter
-    // if singleHospital mode and hospitalName provided, prefer that hospital's doctors only
-    const matchesHospital = !singleHospital || !hospitalName || (doctor.hospital && doctor.hospital.toLowerCase().includes(hospitalName.toLowerCase()))
-    return matchesSearch && matchesSpecialty && matchesType && matchesHospital
+      console.log('📥 Fetching Doctors:')
+      console.log('URL:', url)
+      console.log('Auth Token:', token.substring(0, 20) + '...')
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      console.log('Response Status:', response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ Error fetching doctors:', errorData)
+        return
+      }
+
+      const result = await response.json()
+      console.log('✅ Doctors fetched successfully:', result)
+      
+      if (result.doctors && Array.isArray(result.doctors)) {
+        setDoctors(result.doctors)
+        setCurrentPage(result.current_page || 1)
+        setTotalPages(result.total_pages || 1)
+        setTotalRecords(result.total_records || 0)
+        
+        // Extract unique specializations from doctors
+        const uniqueSpecialties = [...new Set(result.doctors.map(d => d.specialization).filter(Boolean))]
+        if (uniqueSpecialties.length > 0) {
+          setSpecialties(uniqueSpecialties)
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching doctors:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Fetch doctors on component mount
+  useEffect(() => {
+    fetchDoctors(1, '')
+  }, [])
+
+  // Handle search with debounce
+  const handleSearch = (value) => {
+    setSearchTerm(value)
+    setCurrentPage(1)
+    // Fetch with new search term
+    setTimeout(() => {
+      fetchDoctors(1, value)
+    }, 300)
+  }
+
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage)
+    fetchDoctors(newPage, searchTerm)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const filteredDoctors = doctors.filter(doctor => {
+    const matchesSpecialty = !selectedSpecialty || doctor.specialization === selectedSpecialty
+    return matchesSpecialty
   })
 
-  const handleDoctorClick = (doctorId) => {
+  const handleDoctorClick = (doctor) => {
+    // Pass doctor data to DoctorProfile component via route
+    // Store doctor data in sessionStorage so it persists during navigation
+    sessionStorage.setItem('selectedDoctorData', JSON.stringify(doctor))
+    
     // If operating in single-hospital mode and we have hospitalId, pass it so doctor profile Back returns to the hospital
     if (hospitalId) {
-      route(`/patient/doctor/${doctorId}?fromHospital=${hospitalId}`)
+      route(`/patient/doctor/${doctor.id}?fromHospital=${hospitalId}`)
     } else {
-      route(`/patient/doctor/${doctorId}`)
+      route(`/patient/doctor/${doctor.id}`)
     }
   }
   return (
@@ -139,9 +146,9 @@ export function SearchDoctor() {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="Search by doctor name, specialty, or disease..."
+                placeholder="Search by doctor name or specialty..."
               />
             </div>
 
@@ -179,50 +186,94 @@ export function SearchDoctor() {
 
         {/* Results */}
         <div className="space-y-4">
-          {filteredDoctors.length === 0 ? (
+          {isLoading ? (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-gray-200 dark:border-gray-700">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 dark:border-green-400"></div>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">Loading doctors...</p>
+            </div>
+          ) : filteredDoctors.length === 0 ? (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-gray-200 dark:border-gray-700">
               <div className="text-6xl mb-4">🔍</div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No doctors found</h3>
               <p className="text-gray-600 dark:text-gray-400">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {filteredDoctors.map(doctor => (
-                <div 
-                  key={doctor.id}
-                  onClick={() => handleDoctorClick(doctor.id)}
-                  className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transition-all cursor-pointer"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-3xl">👨‍⚕️</span>
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{doctor.name}</h3>
-                      <p className="text-green-600 dark:text-green-400 font-medium">{doctor.specialty}</p>
-                      <p className="text-gray-600 dark:text-gray-400 text-sm">{doctor.hospital}</p>
-                      <div className="flex flex-wrap items-center gap-4 mt-3 text-sm">
-                        <span className="text-yellow-600 dark:text-yellow-400 font-medium">⭐ {doctor.rating}</span>
-                        <span className="text-gray-600 dark:text-gray-400">📍 {doctor.distance}</span>
-                        <span className="text-gray-600 dark:text-gray-400">🕒 {doctor.experience}</span>
+            <>
+              <div className="grid grid-cols-1 gap-4">
+                {filteredDoctors.map(doctor => (
+                  <div 
+                    key={doctor.id}
+                    onClick={() => handleDoctorClick(doctor)}
+                    className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transition-all cursor-pointer"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-3xl">👨‍⚕️</span>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          Dr. {doctor.first_name} {doctor.last_name}
+                        </h3>
+                        <p className="text-green-600 dark:text-green-400 font-medium">{doctor.specialization}</p>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">{doctor.email}</p>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">{doctor.mobile_number}</p>
+                      </div>
+                      
+                      <div className="text-left sm:text-right">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDoctorClick(doctor) }}
+                          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium w-full sm:w-auto"
+                        >
+                          View Profile
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="text-left sm:text-right">
-                      <div className="text-2xl font-bold text-gray-900 dark:text-white">₹{doctor.fee}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Next: {doctor.nextSlot}</div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDoctorClick(doctor.id) }}
-                        className="mt-3 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium w-full sm:w-auto"
-                      >
-                        Book Now
-                      </button>
-                    </div>
                   </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-8 pb-4">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`px-3 py-2 rounded-lg transition-colors ${
+                          currentPage === page
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                  
+                  <span className="ml-4 text-sm text-gray-600 dark:text-gray-400">
+                    Page {currentPage} of {totalPages} ({totalRecords} total)
+                  </span>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>

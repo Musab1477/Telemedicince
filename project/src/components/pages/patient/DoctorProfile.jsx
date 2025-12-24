@@ -2,8 +2,36 @@ import { route } from 'preact-router'
 import { useState, useEffect } from 'preact/hooks'
 import { PatientLayout } from '../../ui/PatientLayout'
 
-// Simple mock data and localStorage-based appointment store used as a stubbed backend.
-// Keys are string IDs to match the hospital -> doctor links (e.g. 'd1', 'd2').
+// StarRating Component for detailed feedback
+function StarRating({ label, value, onChange }) {
+  const [hovered, setHovered] = useState(0)
+  
+  return (
+    <div className="flex items-center justify-between">
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map(star => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => onChange(star)}
+            onMouseEnter={() => setHovered(star)}
+            onMouseLeave={() => setHovered(0)}
+            className={`text-2xl transition-all ${
+              star <= (hovered || value)
+                ? 'text-yellow-400 scale-110'
+                : 'text-gray-300 dark:text-gray-600'
+            } hover:scale-125 cursor-pointer`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Mock data fallback
 const DOCTORS = {
   d1: {
     id: 'd1',
@@ -87,10 +115,47 @@ function formatDateISO(d) {
   return d.toISOString().split('T')[0]
 }
 
-export function DoctorProfile({ id }) {
-  // Accept ids like 'd1' (from hospital links) or numeric ids; normalize to string key
+export function DoctorProfile({ id, doctorData }) {
+  // Accept doctor data passed from SearchDoctor or from sessionStorage
   const key = id == null ? 'd1' : String(id)
-  const doctor = DOCTORS[key] || DOCTORS['d1']
+  
+  // Parse passed doctor data or use fallback from mock data
+  const parseDoctor = () => {
+    // Try to get data from sessionStorage first (set by SearchDoctor)
+    let passedData = doctorData
+    if (!passedData) {
+      try {
+        const stored = sessionStorage.getItem('selectedDoctorData')
+        if (stored) {
+          passedData = JSON.parse(stored)
+        }
+      } catch (e) {
+        console.warn('Could not parse stored doctor data:', e)
+      }
+    }
+
+    if (passedData) {
+      // Data from SearchDoctor - API response format
+      return {
+        id: passedData.id || id,
+        name: `Dr. ${passedData.first_name || ''} ${passedData.last_name || ''}`.trim(),
+        specialty: passedData.specialization || passedData.specialty || 'Medical Professional',
+        hospital: passedData.hospital_name || passedData.hospital || 'Independent Practice',
+        address: passedData.address || '',
+        experience: passedData.experience || '5+ years',
+        fee: passedData.consultation_fee || passedData.fee || 500,
+        rating: passedData.rating || 4.5,
+        email: passedData.email || '',
+        mobile: passedData.mobile_number || '',
+        offDates: passedData.off_dates || []
+      }
+    }
+    // Fallback to mock data
+    const mockDoctor = DOCTORS[key] || DOCTORS['d1']
+    return mockDoctor
+  }
+
+  const [doctor, setDoctor] = useState(parseDoctor)
 
   // detect if we were opened from a hospital details page
   let fromHospitalId = null
@@ -107,8 +172,9 @@ export function DoctorProfile({ id }) {
   const [bookedSlots, setBookedSlots] = useState([])
   const [days, setDays] = useState([])
   const [isBooking, setIsBooking] = useState(false)
-  
-  // Feedback form state
+  const [feedbackRating, setFeedbackRating] = useState(0)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [rating, setRating] = useState(0)
   const [hoveredRating, setHoveredRating] = useState(0)
   const [feedback, setFeedback] = useState({
@@ -119,96 +185,106 @@ export function DoctorProfile({ id }) {
     comment: ''
   })
   const [submitted, setSubmitted] = useState(false)
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false)
 
-  const handleSubmitFeedback = (e) => {
-    e.preventDefault()
-    
-    // Validate rating
-    if (rating === 0) {
-      alert('Please provide an overall rating')
-      return
-    }
-    
-    // In real app, submit to API
-    const feedbackData = {
-      doctorId: doctor.id,
-      doctorName: doctor.name,
-      overallRating: rating,
-      knowledge: feedback.knowledge,
-      communication: feedback.communication,
-      punctuality: feedback.punctuality,
-      treatment: feedback.treatment,
-      comment: feedback.comment,
-      timestamp: new Date().toISOString()
-    }
-    
-    // Store in localStorage for demo
-    const existingFeedbacks = JSON.parse(localStorage.getItem('doctorFeedbacks') || '[]')
-    existingFeedbacks.push(feedbackData)
-    localStorage.setItem('doctorFeedbacks', JSON.stringify(existingFeedbacks))
-    
-    setSubmitted(true)
-    
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setSubmitted(false)
-      setRating(0)
-      setFeedback({
-        knowledge: 0,
-        communication: 0,
-        punctuality: 0,
-        treatment: 0,
-        comment: ''
-      })
-    }, 3000)
-  }
-  
-  const StarRating = ({ value, onChange, label, readOnly = false }) => {
-    const [hovered, setHovered] = useState(0)
-    
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-600 dark:text-gray-400 w-40">{label}:</span>
-        <div className="flex gap-1">
-          {[1, 2, 3, 4, 5].map(star => (
-            <button
-              key={star}
-              type="button"
-              disabled={readOnly}
-              onClick={() => !readOnly && onChange(star)}
-              onMouseEnter={() => !readOnly && setHovered(star)}
-              onMouseLeave={() => !readOnly && setHovered(0)}
-              className={`text-2xl transition-colors ${
-                star <= (readOnly ? value : (hovered || value))
-                  ? 'text-yellow-400'
-                  : 'text-gray-300 dark:text-gray-600'
-              } ${!readOnly && 'hover:scale-110 cursor-pointer'}`}
-            >
-              ★
-            </button>
-          ))}
-        </div>
-        <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">{value > 0 ? `${value}/5` : ''}</span>
-      </div>
-    )
-  }
-
+  // Fetch available slots from API when doctor profile loads
   useEffect(() => {
-    // prepare next 14 days
-    const arr = []
-    const today = new Date()
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(today)
-      d.setDate(today.getDate() + i)
-      arr.push({
-        date: formatDateISO(d),
-        display: d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
-        isWeekend: d.getDay() === 0 // treat Sunday as off by default
-      })
-    }
-    setDays(arr)
-  }, [])
+    if (!doctor || !doctor.id) return
 
+    const fetchAvailableSlots = async () => {
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        console.warn('⚠️ No auth token, using mock slots')
+        // Use default slots if no token
+        const arr = []
+        const today = new Date()
+        for (let i = 0; i < 14; i++) {
+          const d = new Date(today)
+          d.setDate(today.getDate() + i)
+          arr.push({
+            date: formatDateISO(d),
+            display: d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
+            isWeekend: d.getDay() === 0,
+            slots: DEFAULT_SLOTS
+          })
+        }
+        setDays(arr)
+        return
+      }
+
+      setIsLoadingSlots(true)
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+        const url = `${baseUrl}doctor/available-slots/${doctor.id}/`
+
+        console.log('📥 Fetching Available Slots:')
+        console.log('URL:', url)
+        console.log('Doctor ID:', doctor.id)
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        console.log('Response Status:', response.status)
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('❌ Failed to fetch slots:', response.status, errorData)
+          throw new Error(`Failed to fetch slots (Status: ${response.status})`)
+        }
+
+        const result = await response.json()
+        console.log('✅ Slots fetched successfully:', result)
+
+        // Parse API response and convert to component format
+        if (result.data && Array.isArray(result.data)) {
+          const daysWithSlots = result.data.map(dayData => ({
+            date: dayData.date,
+            display: `${dayData.day.substring(0, 3)} ${dayData.date.split('-')[2]}`,
+            isWeekend: false,
+            slots: dayData.slots.map(slot => ({
+              start_time: slot.start_time,
+              end_time: slot.end_time,
+              display: `${slot.start_time} - ${slot.end_time}`,
+              is_available: slot.is_available
+            }))
+          }))
+
+          console.log('📦 Formatted Days with Slots:', daysWithSlots)
+          setDays(daysWithSlots)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching slots:', error)
+        // Fallback to default slots on error
+        const arr = []
+        const today = new Date()
+        for (let i = 0; i < 14; i++) {
+          const d = new Date(today)
+          d.setDate(today.getDate() + i)
+          arr.push({
+            date: formatDateISO(d),
+            display: d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
+            isWeekend: d.getDay() === 0,
+            slots: DEFAULT_SLOTS.map(time => ({
+              display: time,
+              start_time: time,
+              end_time: time
+            }))
+          })
+        }
+        setDays(arr)
+      } finally {
+        setIsLoadingSlots(false)
+      }
+    }
+
+    fetchAvailableSlots()
+  }, [doctor])
+  
   useEffect(() => {
     if (!selectedDate) return
     const appointments = loadAppointments()
@@ -219,13 +295,13 @@ export function DoctorProfile({ id }) {
     setSelectedSlot(null)
   }, [selectedDate, doctor])
 
-  const availableSlots = DEFAULT_SLOTS.filter(s => !bookedSlots.includes(s))
+  const availableSlots = selectedDate 
+    ? days.find(d => d.date === selectedDate)?.slots || []
+    : []
 
   const isDateDisabled = (d) => {
-    // disabled if explicit offDates or if weekend (Sunday)
-    if (doctor.offDates && doctor.offDates.includes(d)) return true
-    const day = new Date(d).getDay()
-    return day === 0
+    // No dates are disabled - use all available slots from API
+    return false
   }
 
   function handleBook() {
@@ -237,7 +313,7 @@ export function DoctorProfile({ id }) {
       doctorName: doctor.name,
       specialty: doctor.specialty,
       date: selectedDate,
-      time: selectedSlot,
+      time: selectedSlot.display || selectedSlot,
       fee: doctor.fee
     }
     
@@ -245,6 +321,80 @@ export function DoctorProfile({ id }) {
     
     // Navigate to payment page
     route('/patient/payment')
+  }
+
+  const handleSubmitFeedback = async (e) => {
+    e.preventDefault()
+    
+    if (!rating) return alert('Please select an overall rating')
+    if (!feedback.comment.trim()) return alert('Please enter feedback')
+
+    const token = localStorage.getItem('accessToken')
+    if (!token) return alert('Please login to submit feedback')
+
+    setIsSubmittingFeedback(true)
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+      const response = await fetch(`${baseUrl}doctor/add-feedback/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          doctor_id: doctor.id,
+          overall_rating: rating,
+          knowledge_rating: feedback.knowledge,
+          communication_rating: feedback.communication,
+          punctuality_rating: feedback.punctuality,
+          treatment_rating: feedback.treatment,
+          comment: feedback.comment
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to submit feedback')
+      }
+
+      setSubmitted(true)
+      setRating(0)
+      setFeedback({
+        knowledge: 0,
+        communication: 0,
+        punctuality: 0,
+        treatment: 0,
+        comment: ''
+      })
+      
+      // Reset submission message after 3 seconds
+      setTimeout(() => setSubmitted(false), 3000)
+    } catch (error) {
+      console.error('Error submitting feedback:', error)
+      alert('Failed to submit feedback. Please try again.')
+    } finally {
+      setIsSubmittingFeedback(false)
+    }
+  }
+
+  // Show error if no doctor data available
+  if (!doctor) {
+    return (
+      <PatientLayout title="Doctor Not Found" subtitle="This doctor is unavailable" showSidebar={false}>
+        <div className="max-w-5xl mx-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-gray-200 dark:border-gray-700">
+            <div className="text-6xl mb-4">❌</div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Doctor not found</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">The doctor you're looking for is not available.</p>
+            <button
+              onClick={() => window.history.back()}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </PatientLayout>
+    )
   }
 
   return (
@@ -325,15 +475,28 @@ export function DoctorProfile({ id }) {
                   <div className="text-sm text-gray-600 dark:text-gray-400 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">No slots available on this date.</div>
                 ) : (
                   <div className="grid grid-cols-3 gap-3">
-                    {availableSlots.map(s => (
-                      <button
-                        key={s}
-                        onClick={() => setSelectedSlot(s)}
-                        className={`py-3 px-3 rounded-lg border text-sm font-medium transition-all ${selectedSlot === s ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-green-300 dark:hover:border-green-600'}`}
-                      >
-                        {s}
-                      </button>
-                    ))}
+                    {availableSlots.map((slot, idx) => {
+                      const slotKey = typeof slot === 'string' ? slot : (slot.display || `${slot.start_time}-${slot.end_time}`)
+                      const isSelected = selectedSlot === slot
+                      const isBooked = slot.is_available === false
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => !isBooked && setSelectedSlot(slot)}
+                          disabled={isBooked}
+                          className={`py-3 px-3 rounded-lg border text-sm font-medium transition-all relative ${
+                            isBooked 
+                              ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-600 cursor-not-allowed opacity-60' 
+                              : isSelected 
+                              ? 'bg-green-600 text-white border-green-600 shadow-md' 
+                              : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-green-300 dark:hover:border-green-600'
+                          }`}
+                        >
+                          <div>{typeof slot === 'string' ? slot : slot.display || `${slot.start_time} - ${slot.end_time}`}</div>
+                          {isBooked && <div className="text-xs mt-1 font-semibold text-red-500 dark:text-red-400">Booked</div>}
+                        </button>
+                      )
+                    })}
                   </div>
                 )
               ) : (
@@ -355,7 +518,12 @@ export function DoctorProfile({ id }) {
 
             <div className="mb-6">
               <div className="text-sm text-gray-600 dark:text-gray-400">Selected Time</div>
-              <div className="font-medium text-gray-900 dark:text-white">{selectedSlot || '-'}</div>
+              <div className="font-medium text-gray-900 dark:text-white">
+                {selectedSlot 
+                  ? (typeof selectedSlot === 'string' ? selectedSlot : (selectedSlot.display || `${selectedSlot.start_time} - ${selectedSlot.end_time}`))
+                  : '-'
+                }
+              </div>
             </div>
 
             <button
@@ -462,9 +630,14 @@ export function DoctorProfile({ id }) {
               <div className="flex gap-3">
                 <button
                   type="submit"
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium transition-colors shadow-md hover:shadow-lg"
+                  disabled={isSubmittingFeedback || !rating}
+                  className={`flex-1 text-white py-3 rounded-lg font-medium transition-colors shadow-md ${
+                    isSubmittingFeedback || !rating
+                      ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 hover:shadow-lg'
+                  }`}
                 >
-                  Submit Feedback
+                  {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
                 </button>
                 <button
                   type="button"

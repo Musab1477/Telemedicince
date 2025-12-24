@@ -100,6 +100,10 @@ class User(AbstractUser):
     hospital_name = models.CharField(
         max_length=200, null=True, blank=True
     )
+    
+    consultation_fee = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
     registration_number = models.CharField(
         max_length=100, null=True, blank=True
     )
