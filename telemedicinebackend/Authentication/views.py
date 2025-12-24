@@ -75,7 +75,7 @@ def login_user(request):
 @permission_classes([AllowAny])
 def verify_otp_and_login(request):
     """
-    Step-2 OTP verification & JWT issue
+    Step-2 OTP verification & JWT issue (using Redis)
     """
 
     user_id = request.data.get("user_id")
@@ -87,27 +87,24 @@ def verify_otp_and_login(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # ✅ Redis se OTP verify karo
+    success, message = verify_otp_from_redis(user_id, otp_entered)
+    
+    if not success:
+        return Response(
+            {"message": message},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Get user for token generation
     try:
-        otp_obj = OTP.objects.filter(user_id=user_id).latest("created_at")
-    except OTP.DoesNotExist:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
         return Response(
-            {"message": "OTP not found"},
-            status=status.HTTP_400_BAD_REQUEST
+            {"message": "User not found"},
+            status=status.HTTP_404_NOT_FOUND
         )
 
-    if otp_obj.is_expired():
-        return Response(
-            {"message": "OTP expired"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    if otp_obj.otp != otp_entered:
-        return Response(
-            {"message": "Invalid OTP"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    user = otp_obj.user
     tokens = get_tokens_for_user(user)
 
     return Response(
