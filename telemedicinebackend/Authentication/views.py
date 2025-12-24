@@ -6,11 +6,10 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import login, logout
 from .models import *
-from .models import OTP
 from rest_framework.permissions import IsAuthenticated
 from .serializers import *
 from django.db import IntegrityError
-from .utils import generate_otp, send_otp_twilio
+from .utils import generate_otp, send_otp_twilio, store_otp_in_redis, verify_otp_from_redis
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.paginator import Paginator, EmptyPage
 from django.db.models import Q
@@ -43,19 +42,25 @@ def login_user(request):
         return Response({"message": "User not found"}, status=404)
 
     # 🔐 Doctor / Hospital → password required
-    if user.role in ["doctor", "hospital"]:
-        if not password:
-            return Response({"message": "Password required"}, status=400)
+    if password:
+        if user.role not in ["doctor", "hospital"]:
+            return Response({"message": "Password login not allowed for this user role"}, status=400)
+        
+        if user.status == "pending":
+            return Response({"message": "Your account is still pending approval"}, status=403)
+        
+        if user.status == "rejected":
+            return Response({"message": "Your account registration was rejected"}, status=403)
 
         if not user.check_password(password):
             return Response({"message": "Invalid password"}, status=401)
 
-    # 🔑 Generate OTP
+    # 🔑 Generate OTP and store in Redis
     otp_code = generate_otp()
-    OTP.objects.create(user=user, otp=otp_code)
+    store_otp_in_redis(user.id, otp_code)
 
     # 📲 SEND OTP VIA TWILIO (DEV MODE)
-    send_otp_twilio(otp_code)
+    send_otp_twilio(otp_code, mobile_number)
 
     return Response(
         {
@@ -221,17 +226,7 @@ def create_doctor_user(request):
 
         return Response(
             {
-                "message": "Doctor registered successfully",
-                "doctor": {
-                    "id": doctor.id,
-                    "first_name": doctor.first_name,
-                    "last_name": doctor.last_name,
-                    "mobile_number": doctor.mobile_number,
-                    "email": doctor.email,
-                    "role": doctor.role,
-                },
-                # ⚠️ DEV MODE ONLY
-                "generated_password": generated_password,
+                "message": "You will recieve an email once your account is approved by admin",
             },
             status=status.HTTP_201_CREATED
         )
