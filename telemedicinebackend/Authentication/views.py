@@ -12,6 +12,8 @@ from .serializers import *
 from django.db import IntegrityError
 from .utils import generate_otp, send_otp_twilio
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.core.paginator import Paginator, EmptyPage
+from django.db.models import Q
 
 def get_tokens_for_user(user):
     """
@@ -27,7 +29,8 @@ def get_tokens_for_user(user):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login_user(request):
-
+    
+    print("Login request data:", request.data)  # Debugging line
     mobile_number = request.data.get("mobile_number")
     password = request.data.get("password")  # optional
 
@@ -250,7 +253,106 @@ def create_doctor_user(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-    
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_doctor_users(request):
+    """
+    Get doctor list with:
+    - Search by first_name, last_name, specialization
+    - Pagination
+    """
+
+    try:
+        # 🔐 ROLE CHECK
+        if request.user.role not in ["admin", "hospital", "hospital-doctor","patient"]:
+            return Response(
+                {"message": "You are not authorized to view doctors"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # ---------------- QUERY PARAMS ----------------
+        search_query = request.GET.get("search", "").strip()
+        page = int(request.GET.get("page", 1))
+        per_page = int(request.GET.get("per_page", 10))
+
+        # ---------------- BASE QUERY ----------------
+        try:
+            doctors = User.objects.filter(role="doctor")
+        except Exception as e:
+            return Response(
+                {
+                    "message": "Database error while fetching doctors",
+                    "error": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # ---------------- SEARCH FILTER ----------------
+        try:
+            if search_query:
+                doctors = doctors.filter(
+                    Q(first_name__icontains=search_query) |
+                    Q(last_name__icontains=search_query) |
+                    Q(specialization__icontains=search_query)
+                )
+        except Exception as e:
+            return Response(
+                {
+                    "message": "Search filter failed",
+                    "error": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        doctors = doctors.order_by("-created_at")
+
+        # ---------------- PAGINATION ----------------
+        try:
+            paginator = Paginator(doctors, per_page)
+            paginated_doctors = paginator.get_page(page)
+        except EmptyPage:
+            return Response(
+                {"message": "Page number out of range"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "message": "Pagination failed",
+                    "error": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # ---------------- SERIALIZATION ----------------
+        serializer = DoctorListSerializer(paginated_doctors, many=True)
+
+        # ---------------- SUCCESS RESPONSE ----------------
+        return Response(
+            {
+                "message": "Doctor list fetched successfully",
+                "total_records": doctors.count(),
+                "total_pages": paginator.num_pages,
+                "current_page": page,
+                "per_page": per_page,
+                "records_on_this_page": len(serializer.data),
+                "doctors": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {
+                "message": "Unexpected error occurred",
+                "error": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def create_hospital_user(request):

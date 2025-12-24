@@ -16,18 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from django.urls import include
+from .views  import *
 
-from django.conf import settings
-from django.conf.urls.static import static
-from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('auth/', include('Authentication.urls')),
-    path('hospital/', include('hospital.urls')),
-    path('doctor/', include('doctor.urls')),
-    path('patient/', include('patient.urls')),
+    path('payments/create-order/', create_razorpay_order, name="create_razorpay_order"),
+    path('payments/verify-payment/', verify_payment_and_create_appointment, name="verify_razorpay_payment"),
+    path('appointments/list/', get_booked_appointments, name="get_booked_appointments"),
 ]
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

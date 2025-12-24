@@ -16,18 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from django.urls import include
+from .views  import *
 
-from django.conf import settings
-from django.conf.urls.static import static
-from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('auth/', include('Authentication.urls')),
-    path('hospital/', include('hospital.urls')),
-    path('doctor/', include('doctor.urls')),
-    path('patient/', include('patient.urls')),
+    path('add-schedule/', create_individual_doctor_schedule, name="add_individual_doctor_schedule"),
+    path('view-schedule/', get_individual_doctor_schedule, name="view_individual_doctor_schedule"),
+    path('update-schedule/<int:schedule_id>/', update_individual_doctor_schedule, name="update_individual_doctor_schedule"),
+    path('available-slots/<int:doctor_id>/', get_doctor_available_slots, name="get_doctor_available_slots"),
 ]
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
