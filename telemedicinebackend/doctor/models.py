@@ -42,14 +42,3 @@ class IndividualDoctorSchedule(models.Model):
 
 
 
-class IndividualDoctorFee(models.Model):
-    doctor = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name="individual_fee"
-    )
-
-    amount = models.DecimalField(max_digits=8, decimal_places=2)
-
-    def __str__(self):
-        return f"{self.doctor} | ₹{self.amount}"

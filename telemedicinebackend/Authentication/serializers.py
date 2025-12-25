@@ -140,6 +140,8 @@ class CreateHospitalSerializer(serializers.ModelSerializer):
 
             "admin_name",
             "admin_phone_number",
+            
+            "hospital_digital_stamp",
         )
 
     def create(self, validated_data):

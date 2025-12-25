@@ -19,6 +19,9 @@ def address_proof_upload_path(instance, filename):
 def digital_signature_upload_path(instance, filename):
     return f"users/{instance.username}/digital_signature/{filename}"
 
+def hospital_digital_stamp_upload_path(instance, filename):
+    return f"users/{instance.username}/digital_stamp/{filename}"
+
 
 GENDER_CHOICES = [
     ("male", "Male"),
@@ -95,6 +98,9 @@ class User(AbstractUser):
     digital_signature_certificate = models.FileField(
         upload_to=digital_signature_upload_path, null=True, blank=True
     )
+    
+    hospital_digital_stamp = models.FileField(
+        upload_to=hospital_digital_stamp_upload_path, null=True, blank=True)
 
     # 🔹 HOSPITAL DETAILS
     hospital_name = models.CharField(

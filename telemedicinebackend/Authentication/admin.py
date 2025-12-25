@@ -164,6 +164,7 @@ class UserAdmin(BaseUserAdmin):
                 "city",
                 "state",
                 "pincode",
+                "hospital_digital_stamp",
             ),
             "classes": ("collapse",),
         }),
