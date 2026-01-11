@@ -58,6 +58,7 @@ def login_user(request):
     # 🔑 Generate OTP and store in Redis
     otp_code = generate_otp()
     store_otp_in_redis(user.id, otp_code)
+    print(f"Generated OTP for user {user.id}: {otp_code}")  # Debugging line
 
     # 📲 SEND OTP VIA TWILIO (DEV MODE)
     send_otp_twilio(otp_code, mobile_number)
@@ -150,8 +151,10 @@ def create_patient_user(request):
     """
     try:
         serializer = CreatePatientSerializer(data=request.data)
+        print(request.data)
 
         if not serializer.is_valid():
+            print("Serializer errors:", serializer.errors)  # Debugging line
             return Response(
                 {
                     "message": "Validation error",
