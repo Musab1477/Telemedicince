@@ -10,17 +10,27 @@ export default function GroupPage({ id }) {
   const groupId = parseInt(id, 10)
 
   useEffect(() => {
-    setGroups(getGroups())
-    setPosts(getPosts())
-  }, [])
+    // Load groups and posts from localStorage
+    const loadedGroups = getGroups()
+    const loadedPosts = getPosts()
+    setGroups(loadedGroups)
+    setPosts(loadedPosts)
+    console.log('📥 Loaded posts from localStorage:', loadedPosts)
+  }, [groupId])
 
   // Persist groups/posts when they change
   useEffect(() => {
-    saveGroups(groups)
+    if (groups.length > 0) {
+      saveGroups(groups)
+      console.log('💾 Saved groups to localStorage')
+    }
   }, [groups])
 
   useEffect(() => {
-    savePosts(posts)
+    if (posts.length > 0) {
+      savePosts(posts)
+      console.log('💾 Saved posts to localStorage:', posts)
+    }
   }, [posts])
 
   const group = groups.find(g => g.id === groupId)
@@ -48,9 +58,14 @@ export default function GroupPage({ id }) {
 
   const handleAddPost = () => {
     if (!composerText || !composerText.trim()) return
+    
+    // Get current user info from localStorage
+    const currentUser = JSON.parse(localStorage.getItem('swasthlink_user') || '{}')
+    const authorName = currentUser.name || 'Anonymous'
+    
     const newPost = {
       id: Date.now(),
-      author: 'You',
+      author: authorName,
       group: group.name,
       content: composerText.trim(),
       time: 'just now',
@@ -59,6 +74,7 @@ export default function GroupPage({ id }) {
     }
     const updatedPosts = [newPost, ...posts]
     setPosts(updatedPosts)
+    console.log('✅ New post added:', newPost)
 
     // increment posts count in groups (local update only)
     const updatedGroups = groups.map(g => g.name === group.name ? { ...g, posts: (g.posts || 0) + 1 } : g)

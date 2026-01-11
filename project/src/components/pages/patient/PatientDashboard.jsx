@@ -46,13 +46,25 @@ export function PatientDashboard() {
 
       setProfileData(response)
       
-      // ✅ Update AuthContext with fetched profile data
+      // Get existing user data from localStorage (may have additional fields)
+      const existingUser = JSON.parse(localStorage.getItem('swasthlink_user') || '{}')
+      
+      // Get registration data if available
+      const registrationData = JSON.parse(localStorage.getItem('patientRegistered') || '{}')
+      
+      // ✅ Merge all data sources, preserving local updates
       const userData = {
         ...response,
+        ...registrationData,
+        ...existingUser,  // Local updates take priority
+        // Normalize field names
+        name: existingUser.name || response.name || `${response.first_name || ''} ${response.last_name || ''}`.trim(),
+        phone: existingUser.phone || response.mobile_number || registrationData.phone,
+        mobile_number: response.mobile_number || existingUser.phone || registrationData.phone,
         role: response.role || USER_ROLES.PATIENT
       }
       login(userData)
-      console.log('✅ User updated in AuthContext:', userData)
+      console.log('✅ User updated in AuthContext with merged data:', userData)
     } catch (err) {
       console.error('❌ Profile Fetch Error:', err)
       console.error('Error Status:', err.status)
@@ -147,6 +159,8 @@ export function PatientDashboard() {
 
   const handleHealthAgent = () => {
     route('/patient/health-agent')
+  const handleNGOs = () => {
+    route('/patient/ngos')
   }
 
   // Get display data from profileData or user context
@@ -159,6 +173,7 @@ export function PatientDashboard() {
     { icon: '🏠', label: 'Dashboard', active: true, onClick: () => {} },
     { icon: '📅', label: 'Appointments', active: false, onClick: handleMyAppointments },
     { icon: '🏥', label: 'Hospitals', active: false, onClick: handleHospitals },
+    { icon: '🤝', label: 'NGOs', active: false, onClick: handleNGOs },
     { icon: '📋', label: 'Health Records', active: false, onClick: handleHealthRecords },
     { icon: '👥', label: 'Community', active: false, onClick: handleCommunity },
     { icon: '🤖', label: 'Health Agent', active: false, onClick: handleHealthAgent },
@@ -274,7 +289,7 @@ export function PatientDashboard() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                     </svg>
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    {/* <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span> */}
                   </button>
 
                   {/* Logout */}
