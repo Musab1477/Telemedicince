@@ -1,6 +1,22 @@
 from django.contrib import admin
-from .models import Appointment
+from .models import *
 
+
+    
+class PrescriptionMedicineInline(admin.TabularInline):
+    model = PrescriptionMedicine
+    extra = 1
+
+@admin.register(Prescription)
+class PrescriptionAdmin(admin.ModelAdmin):
+    list_display = ("id", "appointment", "created_at")
+    search_fields = ("appointment__doctor__email", "appointment__patient__email")
+    inlines = [PrescriptionMedicineInline]
+
+class PrescriptionInline(admin.StackedInline):
+    model = Prescription
+    can_delete = False
+    extra = 0
 
 @admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):
@@ -69,3 +85,5 @@ class AppointmentAdmin(admin.ModelAdmin):
     )
 
     ordering = ("-created_at",)
+
+    inlines = [PrescriptionInline]

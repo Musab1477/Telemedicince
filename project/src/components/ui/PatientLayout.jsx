@@ -57,6 +57,11 @@ export function PatientLayout({ children, title, subtitle, showSidebar = true })
     route('/patient/dashboard')
     setCurrentPath('/patient/dashboard')
   }
+  
+  const handleHealthAgent = () => {
+    route('/patient/health-agent')
+    setCurrentPath('/patient/health-agent')
+  }
 
   const isActive = (path) => {
     if (path === '/patient/dashboard') {
@@ -74,9 +79,13 @@ export function PatientLayout({ children, title, subtitle, showSidebar = true })
     if (path === '/patient/reports') {
       return currentPath.startsWith('/patient/reports')
     }
+    if (path === '/patient/health-agent') {
+      return currentPath.startsWith('/patient/health-agent')
+    }
     if (path === '/patient/community') {
       return currentPath.startsWith('/patient/community') || currentPath.startsWith('/patient/group')
     }
+
     return false
   }
 
@@ -117,6 +126,12 @@ export function PatientLayout({ children, title, subtitle, showSidebar = true })
       onClick: handleCommunity, 
       path: '/patient/community' 
     },
+    { 
+      icon: '🤖', 
+      label: 'Health Agent', 
+      onClick: handleHealthAgent, 
+      path: '/patient/health-agent' 
+    },
   ]
 
   return (
@@ -143,7 +158,7 @@ export function PatientLayout({ children, title, subtitle, showSidebar = true })
                   </div>
                   <div className="flex-1 min-w-0 text-left">
                     <p className="font-semibold text-gray-900 dark:text-white truncate">
-                      {user?.name || 'Patient'}
+                      {user?.first_name || 'Aayrin'}
                     </p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
                       Patient
