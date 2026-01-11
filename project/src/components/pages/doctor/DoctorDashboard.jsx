@@ -9,6 +9,8 @@ export function DoctorDashboard() {
   const [profileData, setProfileData] = useState(null)
   const [error, setError] = useState('')
   const [doctorName, setDoctorName] = useState('Dr. Doctor')
+  const [todayAppointments, setTodayAppointments] = useState([])
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false)
 
   useEffect(() => {
     const darkMode = localStorage.getItem('darkMode') === 'true'
@@ -19,6 +21,8 @@ export function DoctorDashboard() {
 
     // Fetch doctor profile on component mount
     fetchDoctorProfile()
+    // Fetch today's appointments
+    fetchTodayAppointments()
   }, [])
 
   const fetchDoctorProfile = async () => {
@@ -38,6 +42,8 @@ export function DoctorDashboard() {
       console.log('✅ Profile Fetch Success:', response)
       console.log('User ID:', response.id)
       console.log('Role:', response.role)
+      console.log('First Name:', response.firsyt_name)
+      console.log('Last Name:', response.last_name)
       console.log('Mobile Number:', response.mobile_number)
 
       setProfileData(response)
@@ -70,6 +76,53 @@ export function DoctorDashboard() {
     }
   }
 
+  const fetchTodayAppointments = async () => {
+    setAppointmentsLoading(true)
+    try {
+      const token = localStorage.getItem('accessToken')
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+      
+      console.log('📡 Fetching appointments from:', `${apiUrl}patient/appointments/list/`)
+      
+      const response = await fetch(`${apiUrl}patient/appointments/list/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (!response.ok) {
+        console.error('❌ Failed to fetch appointments:', response.status)
+        setTodayAppointments([])
+        return
+      }
+      
+      const data = await response.json()
+      console.log('✅ All appointments:', data)
+      
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0]
+      console.log('📅 Today\'s date:', today)
+      
+      // Filter appointments for today
+      const appointmentsArray = Array.isArray(data) ? data : (data.appointments || [])
+      const todayAppts = appointmentsArray.filter(apt => {
+        const aptDate = apt.appointment_date
+        return aptDate === today
+      })
+      
+      console.log('📋 Today\'s appointments:', todayAppts)
+      setTodayAppointments(todayAppts)
+    } catch (err) {
+      console.error('❌ Error fetching appointments:', err)
+      setTodayAppointments([])
+    } finally {
+      setAppointmentsLoading(false)
+    }
+  }
+
   const toggleDarkMode = () => {
     const newMode = !isDark
     setIsDark(newMode)
@@ -88,10 +141,20 @@ export function DoctorDashboard() {
     setIsLoading(true)
     try {
       console.log('🚪 Logging out doctor...')
-      const response = await api.logoutDoctor()
-
-      console.log('✅ Doctor Logout Success:', response)
-      console.log('Message:', response.message)
+      const token = localStorage.getItem('accessToken')
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+      
+      const response = await fetch(`${apiUrl}auth/logout/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      const data = await response.json()
+      console.log('✅ Doctor Logout Success:', data)
 
       // Clear all stored data
       localStorage.removeItem('accessToken')
@@ -105,10 +168,6 @@ export function DoctorDashboard() {
       route('/')
     } catch (err) {
       console.error('❌ Logout Error:', err)
-      console.error('Error Status:', err.status)
-      console.error('Error Body:', err.body)
-      
-      const errorMsg = err.body?.message || err.message || 'Logout failed'
       
       // Still clear data even if API fails
       localStorage.removeItem('accessToken')
@@ -116,7 +175,7 @@ export function DoctorDashboard() {
       localStorage.removeItem('user')
       localStorage.removeItem('isAuthenticated')
       
-      alert('Logged out (Error: ' + errorMsg + ')')
+      alert('Logged out (with error, but cleared local data)')
       route('/')
     } finally {
       setIsLoading(false)
@@ -141,7 +200,7 @@ export function DoctorDashboard() {
   const menuItems = [
     { icon: '🏠', label: 'Dashboard', active: true, onClick: () => {} },
     { icon: '📅', label: 'Schedule', onClick: handleSchedule },
-    { icon: '📋', label: 'EMR', onClick: handleEMR },
+    // { icon: '📋', label: 'EMR', onClick: handleEMR },
     { icon: '💊', label: 'Prescriptions', onClick: handlePrescriptions },
     { icon: '🎥', label: 'Consultations', onClick: consultation },
   ]
@@ -178,18 +237,33 @@ export function DoctorDashboard() {
 
             {/* User Profile */}
             <button 
-              onClick={() => route('/doctor/profile')}
-              className="w-full bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-700 dark:to-gray-700 rounded-xl p-4 mb-6 hover:from-green-100 hover:to-emerald-100 dark:hover:from-gray-600 dark:hover:to-gray-600 transition-all"
+              onClick={() => {
+                console.log('🔍 Profile button clicked!')
+                console.log('📦 profileData:', profileData)
+                console.log('🆔 profileData.id:', profileData?.id)
+                
+                if (profileData?.id) {
+                  console.log('✅ Navigating to /doctor/profile/' + profileData.id)
+                  route(`/doctor/profile/${profileData.id}`)
+                } else {
+                  console.warn('⚠️ No profile ID found, navigating without ID')
+                  // Navigate anyway to see the page
+                  route('/doctor/profile')
+                }
+              }}
+              className="w-full bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-700 dark:to-gray-700 rounded-xl p-4 mb-6 hover:from-green-100 hover:to-emerald-100 dark:hover:from-gray-600 dark:hover:to-gray-600 transition-all cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">
-                  {(doctorName || 'D').charAt(4).toUpperCase()}
+                  {profileData?.first_name ? profileData.first_name.charAt(0).toUpperCase() : 'D'}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className="font-semibold text-gray-900 dark:text-white truncate">
-                    {doctorName}
+                    Dr. {profileData?.first_name} {profileData?.last_name}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Doctor</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    {profileData?.role ? profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1) : 'Doctor'}
+                  </p>
                 </div>
               </div>
             </button>
@@ -213,7 +287,7 @@ export function DoctorDashboard() {
             </nav>
 
             {/* Emergency Button */}
-            <div className="mt-auto pt-6">
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
               <button className="w-full bg-red-500 hover:bg-red-600 text-white rounded-lg px-4 py-3 flex items-center justify-center gap-2 font-medium transition-colors">
                 <span className="text-xl">🚨</span>
                 <span className="text-sm">Emergency: 108</span>
@@ -240,7 +314,7 @@ export function DoctorDashboard() {
                   </button>
                   <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Welcome back, {doctorName}!</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Welcome back,  Dr. {profileData?.first_name} {profileData?.last_name}!</p>
                   </div>
                 </div>
 
@@ -347,7 +421,7 @@ export function DoctorDashboard() {
             {/* Quick Actions */}
             <div className="mb-8">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <button
                   onClick={handleSchedule}
                   className="bg-white dark:bg-gray-800 border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600 rounded-2xl p-6 hover:shadow-lg transform hover:scale-105 transition-all group"
@@ -362,7 +436,7 @@ export function DoctorDashboard() {
                   </div>
                 </button>
 
-                <button
+                {/* <button
                   onClick={handleEMR}
                   className="bg-white dark:bg-gray-800 border-2 border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-600 rounded-2xl p-6 hover:shadow-lg transform hover:scale-105 transition-all group"
                 >
@@ -374,7 +448,7 @@ export function DoctorDashboard() {
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">EMR Records</h3>
                   </div>
-                </button>
+                </button> */}
 
                 <button
                   onClick={handlePrescriptions}
@@ -413,92 +487,63 @@ export function DoctorDashboard() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Today's Appointments</h2>
-                <span className="text-sm text-gray-600 dark:text-gray-400">3 scheduled</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">{todayAppointments.length} scheduled</span>
               </div>
               <div className="space-y-4">
-                {/* Appointment 1 */}
-                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10 border-2 border-blue-100 dark:border-blue-800 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-600 transition-all">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-                          JD
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white">John Doe</h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Age: 45 • Male</p>
-                        </div>
-                      </div>
-                      <div className="ml-13">
-                        <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">General Checkup</p>
-                      </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-2">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-700 px-3 py-1 rounded-lg">
-                        10:00 AM
-                      </div>
-                      <button onClick={consultation} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                        Start
-                      </button>
-                    </div>
+                {appointmentsLoading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="text-gray-600 dark:text-gray-400">Loading appointments...</div>
                   </div>
-                </div>
+                ) : todayAppointments.length === 0 ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="text-gray-600 dark:text-gray-400">No appointments scheduled for today</div>
+                  </div>
+                ) : (
+                  todayAppointments.map((appointment, index) => {
+                    const colors = [
+                      { bg: 'from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10', border: 'border-blue-100 dark:border-blue-800', avatar: 'bg-blue-600', text: 'text-blue-600 dark:text-blue-400' },
+                      { bg: 'from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10', border: 'border-green-100 dark:border-green-800', avatar: 'bg-green-600', text: 'text-green-600 dark:text-green-400' },
+                      { bg: 'from-orange-50 to-red-50 dark:from-orange-900/10 dark:to-red-900/10', border: 'border-orange-100 dark:border-orange-800', avatar: 'bg-orange-600', text: 'text-orange-600 dark:text-orange-400' },
+                      { bg: 'from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10', border: 'border-purple-100 dark:border-purple-800', avatar: 'bg-purple-600', text: 'text-purple-600 dark:text-purple-400' },
+                      { bg: 'from-yellow-50 to-amber-50 dark:from-yellow-900/10 dark:to-amber-900/10', border: 'border-yellow-100 dark:border-yellow-800', avatar: 'bg-yellow-600', text: 'text-yellow-600 dark:text-yellow-400' },
+                    ];
+                    const colorScheme = colors[index % colors.length];
+                    const initials = appointment.patient_name.split(' ').map(n => n[0]).join('').toUpperCase();
 
-                {/* Appointment 2 */}
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 border-2 border-green-100 dark:border-green-800 rounded-xl p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold">
-                          JS
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white">Jane Smith</h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Age: 32 • Female</p>
-                        </div>
-                      </div>
-                      <div className="ml-13">
-                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">Follow-up Visit</p>
-                      </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-2">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-700 px-3 py-1 rounded-lg">
-                        2:00 PM
-                      </div>
-                      <button className="bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed">
-                        Scheduled
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Appointment 3 */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/10 dark:to-red-900/10 border-2 border-orange-100 dark:border-orange-800 rounded-xl p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center text-white font-semibold">
-                          RW
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white">Robert Wilson</h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Age: 58 • Male</p>
+                    return (
+                      <div key={appointment.id || index} className={`bg-gradient-to-r ${colorScheme.bg} border-2 ${colorScheme.border} rounded-xl p-4 hover:border-opacity-75 dark:hover:border-opacity-75 transition-all`}>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className={`w-10 h-10 rounded-full ${colorScheme.avatar} flex items-center justify-center text-white font-semibold text-sm`}>
+                                {initials}
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-gray-900 dark:text-white">{appointment.patient_name}</h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                  Amount: ₹{appointment.amount || 'N/A'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="ml-13">
+                              <p className={`text-sm ${colorScheme.text} font-medium`}>
+                                {appointment.start_time} - {appointment.end_time}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right flex flex-col items-end gap-2">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-700 px-3 py-1 rounded-lg">
+                              {appointment.start_time}
+                            </div>
+                            <button onClick={consultation} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                              Start
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="ml-13">
-                        <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Diabetes Consultation</p>
-                      </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-2">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-700 px-3 py-1 rounded-lg">
-                        4:30 PM
-                      </div>
-                      <button className="bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed">
-                        Scheduled
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

@@ -8,13 +8,14 @@ export default function PatientProfileClean() {
   const [editing, setEditing] = useState(false)
   
   // Use user data or fallback to empty strings
-  const displayUser = user || { name: '', phone: '', email: '', dob: '', gender: '', address: '', emergencyContact: '' }
+  const displayUser = user || { first_name: '', last_name: '', mobile_number: '', email: '', age: '', gender: '', address: '', emergencyContact: '' }
   
   const [form, setForm] = useState(() => ({
-    name: displayUser?.name || '',
-    phone: displayUser?.phone || '',
+    first_name: displayUser?.first_name || '',
+    last_name: displayUser?.last_name || '',
+    phone: displayUser?.mobile_number || '',
     email: displayUser?.email || '',
-    dob: displayUser?.dob || '',
+    age: displayUser?.age || '',
     gender: displayUser?.gender || '',
     address: displayUser?.address || '',
     emergencyContact: displayUser?.emergencyContact || ''
@@ -32,6 +33,60 @@ export default function PatientProfileClean() {
     setEditing(false)
   }
 
+  const handleLogout = async () => {
+    const confirmLogout = confirm('Are you sure you want to logout?')
+    if (!confirmLogout) return
+
+    try {
+      console.log('🚪 Logging out user from PatientProfile...')
+      const accessToken = localStorage.getItem('accessToken')
+      
+      if (!accessToken) {
+        console.log('⚠️ No access token found')
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        localStorage.removeItem('user')
+        localStorage.removeItem('isAuthenticated')
+        route('/')
+        return
+      }
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+
+      const response = await fetch(`${apiUrl}auth/logout/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      })
+
+      console.log('📥 Logout Response Status:', response.status)
+
+      // Clear localStorage regardless of response
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('pendingUserId')
+      localStorage.removeItem('pendingPhone')
+
+      console.log('✅ Logged out successfully!')
+      alert('✅ Logged out successfully!')
+      route('/')
+    } catch (err) {
+      console.error('❌ Logout Error:', err)
+      // Still clear localStorage even if API fails
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      alert('Logged out (with error)')
+      route('/')
+    }
+  }
+
   return (
     <PatientLayout title="My Profile" subtitle="Manage your personal information">
       <div className="max-w-4xl mx-auto">
@@ -40,35 +95,46 @@ export default function PatientProfileClean() {
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
             <div className="relative">
               <div className="w-24 h-24 rounded-full bg-green-600 flex items-center justify-center text-white text-4xl font-semibold shadow-lg">
-                {(displayUser.name||displayUser.phone||'U').charAt(0).toUpperCase()}
+                {((displayUser.first_name?.charAt(0) || 'U') + (displayUser.last_name?.charAt(0) || '')).toUpperCase()}
               </div>
               <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white border-4 border-green-50 dark:border-gray-900">
                 ✓
               </div>
             </div>
             <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{displayUser.name || 'Patient'}</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{`${displayUser.first_name || ''} ${displayUser.last_name || ''}`.trim() || 'Patient'}</h2>
               <p className="text-gray-600 dark:text-gray-400 mb-2">{displayUser.email || 'No email provided'}</p>
               <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                 <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-medium">
                   Patient Account
                 </span>
                 <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-xs font-medium">
-                  ID: #{displayUser.phone || 'Not Set'}
+                  ID: #{displayUser.id || 'Not Set'}
                 </span>
               </div>
             </div>
             <div className="flex gap-2">
               {!editing ? (
-                <button 
-                  onClick={() => setEditing(true)} 
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  Edit Profile
-                </button>
+                <>
+                  <button 
+                    onClick={() => setEditing(true)} 
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Profile
+                  </button>
+                  <button 
+                    onClick={handleLogout} 
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Logout
+                  </button>
+                </>
               ) : (
                 <button 
                   onClick={() => setEditing(false)} 
@@ -100,17 +166,17 @@ export default function PatientProfileClean() {
                     <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
-                    <p className="text-gray-900 dark:text-white font-medium">{displayUser.phone || 'Not provided'}</p>
+                    <p className="text-gray-900 dark:text-white font-medium">{displayUser.mobile_number || 'Not provided'}</p>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date of Birth</label>
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Age</label>
                   <div className="flex items-center gap-2">
                     <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h-2m6 0h-2M4 10h2M4 14h2m6 0h2m6 0h2M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <p className="text-gray-900 dark:text-white font-medium">{displayUser.dob || 'Not provided'}</p>
+                    <p className="text-gray-900 dark:text-white font-medium">{displayUser.age ? `${displayUser.age} years` : 'Not provided'}</p>
                   </div>
                 </div>
 
@@ -159,14 +225,27 @@ export default function PatientProfileClean() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Full Name
+                      First Name
                     </label>
                     <input 
-                      name="name" 
-                      value={form.name} 
+                      name="first_name" 
+                      value={form.first_name} 
                       onInput={handleChange} 
                       className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent transition-colors"
-                      placeholder="Enter your full name"
+                      placeholder="Enter your first name"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Last Name
+                    </label>
+                    <input 
+                      name="last_name" 
+                      value={form.last_name} 
+                      onInput={handleChange} 
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent transition-colors"
+                      placeholder="Enter your last name"
                     />
                   </div>
                   
@@ -185,6 +264,20 @@ export default function PatientProfileClean() {
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Age
+                    </label>
+                    <input 
+                      name="age" 
+                      type="number"
+                      value={form.age} 
+                      onInput={handleChange} 
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent transition-colors"
+                      placeholder="Enter your age"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Email Address
                     </label>
                     <input 
@@ -194,19 +287,6 @@ export default function PatientProfileClean() {
                       onInput={handleChange} 
                       className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent transition-colors"
                       placeholder="your.email@example.com"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Date of Birth
-                    </label>
-                    <input 
-                      name="dob" 
-                      type="date"
-                      value={form.dob} 
-                      onInput={handleChange} 
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent transition-colors"
                     />
                   </div>
                 </div>

@@ -1,7 +1,20 @@
 from django.conf import settings
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+from streamlit import user
 
+
+def get_default_password(user):
+    if user.role == "doctor":
+        first = (user.first_name or "").lower()
+        last = (user.last_name or "").lower()
+        return f"{first}{last}@123"
+
+    elif user.role == "hospital":
+        name = (user.hospital_name or "").replace(" ", "").lower()
+        return f"{name}@123"
+
+    return None
 
 def get_approval_email_template(user):
     """Email template for approved users"""
@@ -11,7 +24,7 @@ def get_approval_email_template(user):
     name = f"{first_name} {last_name}".strip() if (first_name or last_name) else user.username
     role = user.role.replace("-", " ").title() if user.role else "User"
     # Generate default password
-    default_password = f"{first_name}{last_name}@123"
+    default_password = get_default_password(user)
     username = user.username
     
     return f"""

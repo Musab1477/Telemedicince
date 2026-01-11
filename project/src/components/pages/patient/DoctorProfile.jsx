@@ -142,7 +142,7 @@ export function DoctorProfile({ id, doctorData }) {
         specialty: passedData.specialization || passedData.specialty || 'Medical Professional',
         hospital: passedData.hospital_name || passedData.hospital || 'Independent Practice',
         address: passedData.address || '',
-        experience: passedData.experience || '5+ years',
+        experience: passedData.years_of_experience || '5+ years',
         fee: passedData.consultation_fee || passedData.fee || 500,
         rating: passedData.rating || 4.5,
         email: passedData.email || '',

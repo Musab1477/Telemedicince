@@ -159,15 +159,7 @@ class User(AbstractUser):
 
 
 # models.py
-from django.utils import timezone
 
-class OTP(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    otp = models.CharField(max_length=6)
-    created_at = models.DateTimeField(default=timezone.now)
-
-    def is_expired(self):
-        return (timezone.now() - self.created_at).seconds > 300  # 5 min
 
 
 # Signal to send email when status changes

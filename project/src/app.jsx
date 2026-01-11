@@ -99,6 +99,7 @@ export function App() {
         <Route path="/verification-pending" component={VerificationPendingPage} />
         <Route path="/doctor/join-clinic" component={JoinClinicRequest} />
         <Route path="/doctor/independent" component={IndependentPractice} />
+        <Route path="/doctor/profile/:id" component={DoctorProfileSelf} />
         <Route path="/doctor/profile" component={DoctorProfileSelf} />
 
         

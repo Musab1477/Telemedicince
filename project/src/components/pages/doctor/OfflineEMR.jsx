@@ -25,6 +25,7 @@ export function OfflineEMR({ patientId }) {
   const [showAddRecord, setShowAddRecord] = useState(false)
   const [isDark, setIsDark] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [profileData, setProfileData] = useState(null)
 
   useEffect(() => {
     const darkMode = localStorage.getItem('darkMode') === 'true'
@@ -34,7 +35,33 @@ export function OfflineEMR({ patientId }) {
     } else {
       document.documentElement.classList.remove('dark')
     }
+    // Fetch doctor profile
+    fetchDoctorProfile()
   }, [])
+
+  const fetchDoctorProfile = async () => {
+    try {
+      const token = localStorage.getItem('accessToken')
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+      
+      const response = await fetch(`${apiUrl}auth/profile/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setProfileData(data)
+        console.log('✅ Profile loaded:', data)
+      }
+    } catch (err) {
+      console.error('❌ Profile fetch error:', err)
+    }
+  }
 
   const toggleDarkMode = () => {
     const newDarkMode = !isDark
@@ -240,14 +267,18 @@ export function OfflineEMR({ patientId }) {
               <h2 className="text-xl font-bold text-green-600 dark:text-green-400">SwasthLink</h2>
             </div>
             <button 
-              onClick={() => route('/doctor/profile')}
+              onClick={() => profileData?.id && route(`/doctor/profile/${profileData.id}`)}
               className="w-full bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-700 dark:to-gray-700 rounded-xl p-4 mb-6 hover:from-green-100 hover:to-emerald-100 dark:hover:from-gray-600 dark:hover:to-gray-600 transition-all"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">SJ</div>
+                <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">
+                  {profileData?.first_name ? profileData.first_name.charAt(0).toUpperCase() : 'D'}
+                </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="font-semibold text-gray-900 dark:text-white truncate">Dr. Sarah Johnson</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Cardiologist</p>
+                  <p className="font-semibold text-gray-900 dark:text-white truncate">Dr. {profileData?.first_name} {profileData?.last_name}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    {profileData?.role ? profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1) : 'Doctor'}
+                  </p>
                 </div>
               </div>
             </button>

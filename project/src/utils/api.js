@@ -117,6 +117,34 @@ export async function createHospital(payload) {
   })
 }
 
+export async function createHospitalWithFiles(formData) {
+  // For FormData, we need to use fetch directly without JSON stringification
+  // and let the request helper handle the URL construction
+  const cleanBase = BASE_URL.replace(/\/$/, '')
+  const fullUrl = `${cleanBase}/auth/create-hospital/`
+  
+  console.log('API Request with Files:', fullUrl)
+  
+  const res = await fetch(fullUrl, {
+    method: 'POST',
+    body: formData
+    // Note: Do NOT set Content-Type header when using FormData - browser will set it automatically
+  })
+
+  const contentType = res.headers.get('content-type') || ''
+  let body = null
+  if (contentType.includes('application/json')) body = await res.json()
+  else body = await res.text()
+
+  if (!res.ok) {
+    const err = new Error(body?.message || `Request failed: ${res.status}`)
+    err.status = res.status
+    err.body = body
+    throw err
+  }
+  return body
+}
+
 // Patient Login APIs
 export async function loginPatient(mobileNumber) {
   console.log('📤 Patient Login Request:', { mobile_number: mobileNumber })
@@ -225,4 +253,4 @@ export async function getHospitalProfile() {
   })
 }
 
-export default { postDoctorRegistration, getRegistrationStatus, resendRegistration, cancelRegistration, createPatient, createDoctor, createDoctorWithFiles, createHospital, loginPatient, verifyOTP, logoutPatient, getPatientProfile, loginDoctor, verifyDoctorOTP, logoutDoctor, getDoctorProfile, loginHospital, verifyHospitalOTP, logoutHospital, getHospitalProfile }
+export default { postDoctorRegistration, getRegistrationStatus, resendRegistration, cancelRegistration, createPatient, createDoctor, createDoctorWithFiles, createHospital, createHospitalWithFiles, loginPatient, verifyOTP, logoutPatient, getPatientProfile, loginDoctor, verifyDoctorOTP, logoutDoctor, getDoctorProfile, loginHospital, verifyHospitalOTP, logoutHospital, getHospitalProfile }

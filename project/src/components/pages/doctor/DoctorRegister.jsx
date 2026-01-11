@@ -36,7 +36,7 @@ export function DoctorRegister() {
     specialization: '',
     experience: '',
     qualification: '',
-    hospital: '',
+    consultationCharge: '',
     hospitalType: 'private', // private | government
   })
 
@@ -112,11 +112,7 @@ export function DoctorRegister() {
       formDataToSend.append('specialization', formData.specialization)
       formDataToSend.append('years_of_experience', parseInt(formData.experience, 10) || 0)
       formDataToSend.append('highest_qualification', formData.qualification)
-      
-      // Add current hospital (optional)
-      if (formData.hospital) {
-        formDataToSend.append('current_hospital', formData.hospital)
-      }
+      formDataToSend.append('consultation_fee', parseInt(formData.consultationCharge, 10) || 0)
 
       // Add degree files (required)
       documents.degreeFiles.forEach((file, index) => {
@@ -157,7 +153,7 @@ export function DoctorRegister() {
         specialization: formData.specialization,
         years_of_experience: parseInt(formData.experience, 10) || 0,
         highest_qualification: formData.qualification,
-        current_hospital: formData.hospital || 'Not provided'
+        consultation_fee: parseInt(formData.consultationCharge, 10) || 0
       })
       console.log('Document Files Being Sent:', {
         degree_files: documents.degreeFiles.map(f => f.name),
@@ -186,8 +182,8 @@ export function DoctorRegister() {
         generatedPassword: response.generated_password
       }))
 
-      // Show success alert with generated password
-      alert(`Registration Successful!\n\nYour temporary password has been sent to your email.\n\nPassword: ${response.generated_password}`)
+      // Show success alert with API message
+      alert(response.message || 'Registration Successful!')
       route('/doctor/login')
       return
     } catch (err) {
@@ -387,13 +383,15 @@ export function DoctorRegister() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current Hospital/Clinic (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Consultation Charge (in ₹) *</label>
                   <input 
-                    type="text" 
-                    value={formData.hospital} 
-                    onInput={e => updateFormData('hospital', e.target.value)} 
+                    type="number" 
+                    value={formData.consultationCharge} 
+                    onInput={e => updateFormData('consultationCharge', e.target.value)} 
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 transition-colors" 
-                    placeholder="Hospital/Clinic Name" 
+                    placeholder="Enter consultation fee" 
+                    min="0"
+                    required
                   />
                 </div>
 
