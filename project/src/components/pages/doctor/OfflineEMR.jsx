@@ -1,30 +1,40 @@
 import { useState, useEffect } from 'preact/hooks'
 import { route } from 'preact-router'
+import { useAuth } from '../../../contexts/AuthContext'
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+
+const FREQUENCY_OPTIONS = [
+  { key: 'once', value: 'Once a day' },
+  { key: 'twice', value: 'Twice a day' },
+  { key: 'thrice', value: 'Thrice a day' },
+  { key: 'sos', value: 'SOS' }
+]
+
+const TIMING_OPTIONS = [
+  { key: 'before_food', value: 'Before Food' },
+  { key: 'after_food', value: 'After Food' },
+  { key: 'empty_stomach', value: 'Empty Stomach' }
+]
 
 export function OfflineEMR({ patientId }) {
-  console.log('OfflineEMR rendering with patientId:', patientId)
-  
-  // Test to see if component renders at all
-  // if (true) {
-  //   return (
-  //     <div style={{ padding: '20px', background: 'white', minHeight: '100vh' }}>
-  //       <h1 style={{ color: 'red', fontSize: '24px', marginBottom: '10px' }}>EMR PAGE TEST</h1>
-  //       <p style={{ fontSize: '18px' }}>Patient ID from route: {patientId || 'No ID provided'}</p>
-  //       <button 
-  //         onClick={() => window.location.href = '/doctor/consultations'}
-  //         style={{ padding: '10px 20px', background: 'blue', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '10px' }}
-  //       >
-  //         Back to Consultations
-  //       </button>
-  //     </div>
-  //   )
-  // }
-  
+  const { user } = useAuth()
+  const [patients, setPatients] = useState([])
   const [selectedPatient, setSelectedPatient] = useState(null)
+  const [prescriptions, setPrescriptions] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddRecord, setShowAddRecord] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingPrescription, setEditingPrescription] = useState(null)
+  const [editForm, setEditForm] = useState({ diagnosis: '', additional_notes: '', medicines: [] })
   const [isDark, setIsDark] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [prescriptionLoading, setPrescriptionLoading] = useState(false)
+  const [updateLoading, setUpdateLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const doctorId = user?.id || user?.doctor_id || user?.user_id
 
   useEffect(() => {
     const darkMode = localStorage.getItem('darkMode') === 'true'
@@ -47,170 +57,177 @@ export function OfflineEMR({ patientId }) {
     }
   }
 
-  const mockPatients = [
-    {
-      id: 'pat_001',
-      name: 'Priya Sharma',
-      age: 28,
-      gender: 'Female',
-      phone: '+91-9876543210',
-      lastVisit: '2024-01-10',
-      condition: 'Fever and headache'
-    },
-    {
-      id: 'pat_002',
-      name: 'Rajesh Kumar',
-      age: 45,
-      gender: 'Male',
-      phone: '+91-9876543211',
-      lastVisit: '2024-01-12',
-      condition: 'Chest pain'
-    },
-    {
-      id: 'pat_003',
-      name: 'John Doe',
-      age: 50,
-      gender: 'Male',
-      phone: '+91-9876543212',
-      lastVisit: '2024-01-15',
-      condition: 'Follow-up'
-    },
-    {
-      id: 'pat_004',
-      name: 'Anita Deshpande',
-      age: 34,
-      gender: 'Female',
-      phone: '+91-9876543213',
-      lastVisit: '2024-01-18',
-      condition: 'Skin rash'
-    },
-    {
-      id: 1,
-      name: 'John Doe',
-      age: 45,
-      gender: 'Male',
-      phone: '+91-9876543210',
-      lastVisit: '2024-01-10',
-      condition: 'Diabetes'
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      age: 32,
-      gender: 'Female',
-      phone: '+91-9876543211',
-      lastVisit: '2024-01-12',
-      condition: 'Hypertension'
-    },
-    {
-      id: 3,
-      name: 'Robert Wilson',
-      age: 58,
-      gender: 'Male',
-      phone: '+91-9876543212',
-      lastVisit: '2024-01-15',
-      condition: 'Heart Disease'
+  // Fetch patients list
+  useEffect(() => {
+    const fetchPatients = async () => {
+      if (!doctorId) {
+        setLoading(false)
+        return
+      }
+      
+      try {
+        setLoading(true)
+        setError(null)
+        const accessToken = localStorage.getItem('accessToken')
+        const cleanBase = BASE_URL.replace(/\/$/, '')
+        const response = await fetch(`${cleanBase}/doctor/${doctorId}/patients/`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch patients: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        setPatients(data.patients || [])
+      } catch (err) {
+        console.error('Error fetching patients:', err)
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+
+    fetchPatients()
+  }, [doctorId])
 
   // Auto-select patient if patientId is provided
   useEffect(() => {
-    if (patientId && !selectedPatient) {
-      console.log('Looking for patient with ID:', patientId)
-      const patient = mockPatients.find(p => String(p.id) === String(patientId))
-      console.log('Found patient:', patient)
+    if (patientId && patients.length > 0 && !selectedPatient) {
+      const patient = patients.find(p => String(p.id) === String(patientId))
       if (patient) {
-        setSelectedPatient(patient)
-      } else {
-        console.log('Patient not found. Available patients:', mockPatients.map(p => ({ id: p.id, name: p.name })))
+        handlePatientSelect(patient)
       }
     }
-  }, [patientId, selectedPatient])
+  }, [patientId, patients])
 
-  const mockRecords = {
-    'pat_001': [
-      {
-        id: 1,
-        date: '2024-01-10',
-        symptoms: 'Fever (102°F), headache, body ache',
-        diagnosis: 'Viral Fever',
-        prescription: 'Paracetamol 500mg TDS, Rest',
-        notes: 'Advised plenty of fluids and rest. Follow up if fever persists beyond 3 days.'
+  // Fetch prescriptions when patient is selected
+  const handlePatientSelect = async (patient) => {
+    setSelectedPatient(patient)
+    setPrescriptions([])
+    
+    if (!doctorId || !patient.id) return
+    
+    try {
+      setPrescriptionLoading(true)
+      const accessToken = localStorage.getItem('accessToken')
+      const cleanBase = BASE_URL.replace(/\/$/, '')
+      const response = await fetch(`${cleanBase}/doctor/${doctorId}/patient/${patient.id}/prescriptions/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch prescriptions: ${response.status}`)
       }
-    ],
-    'pat_002': [
-      {
-        id: 1,
-        date: '2024-01-12',
-        symptoms: 'Chest pain, shortness of breath',
-        diagnosis: 'Suspected Angina - Needs further investigation',
-        prescription: 'Aspirin 75mg OD, Nitrate spray SOS',
-        notes: 'ECG shows signs of ischemia. Referred to cardiologist. Emergency protocol explained.'
-      }
-    ],
-    'pat_003': [
-      {
-        id: 1,
-        date: '2024-01-15',
-        symptoms: 'Routine follow-up, feeling better',
-        diagnosis: 'Post-treatment follow-up',
-        prescription: 'Continue current medication',
-        notes: 'Patient showing improvement. Advised lifestyle modifications.'
-      }
-    ],
-    'pat_004': [
-      {
-        id: 1,
-        date: '2024-01-18',
-        symptoms: 'Skin rash, itching',
-        diagnosis: 'Allergic dermatitis',
-        prescription: 'Antihistamine cream, Cetirizine 10mg OD',
-        notes: 'Advised to avoid allergens. Follow up in 1 week if no improvement.'
-      }
-    ],
-    1: [
-      {
-        id: 1,
-        date: '2024-01-10',
-        symptoms: 'Increased thirst, frequent urination',
-        diagnosis: 'Diabetes Type 2',
-        prescription: 'Metformin 500mg twice daily',
-        notes: 'Blood sugar levels elevated. Advised dietary changes.'
-      },
-      {
-        id: 2,
-        date: '2024-01-05',
-        symptoms: 'Fatigue, dizziness',
-        diagnosis: 'Diabetes management',
-        prescription: 'Continue current medication',
-        notes: 'Patient showing improvement.'
-      }
-    ],
-    2: [
-      {
-        id: 3,
-        date: '2024-01-12',
-        symptoms: 'Headache, chest pain',
-        diagnosis: 'Hypertension',
-        prescription: 'Amlodipine 5mg daily',
-        notes: 'Blood pressure: 150/95. Needs monitoring.'
-      }
-    ],
-    3: [
-      {
-        id: 4,
-        date: '2024-01-15',
-        symptoms: 'Chest pain, shortness of breath',
-        diagnosis: 'Angina',
-        prescription: 'Nitroglycerin as needed',
-        notes: 'Referred to cardiologist for further evaluation.'
-      }
-    ]
+      
+      const data = await response.json()
+      setPrescriptions(data.prescriptions || [])
+    } catch (err) {
+      console.error('Error fetching prescriptions:', err)
+    } finally {
+      setPrescriptionLoading(false)
+    }
   }
 
-  const filteredPatients = mockPatients.filter(patient =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.phone.includes(searchTerm)
+  // Open edit modal with prefilled data
+  const handleEditPrescription = (prescription) => {
+    setEditingPrescription(prescription)
+    setEditForm({
+      diagnosis: prescription.diagnosis || '',
+      additional_notes: prescription.additional_notes || '',
+      medicines: prescription.medicines?.map(med => ({
+        id: med.id,
+        medicine_name: med.medicine_name || '',
+        dose: med.dose || '',
+        frequency: med.frequency || 'once',
+        timing: med.timing || 'after_food',
+        duration: med.duration || ''
+      })) || []
+    })
+    setShowEditModal(true)
+  }
+
+  // Update prescription API call
+  const handleUpdatePrescription = async (e) => {
+    e.preventDefault()
+    if (!editingPrescription) return
+
+    try {
+      setUpdateLoading(true)
+      const accessToken = localStorage.getItem('accessToken')
+      const cleanBase = BASE_URL.replace(/\/$/, '')
+      
+      const payload = {
+        diagnosis: editForm.diagnosis,
+        additional_notes: editForm.additional_notes,
+        medicines: editForm.medicines.map(med => ({
+          medicine_name: med.medicine_name,
+          dose: med.dose,
+          frequency: med.frequency,
+          timing: med.timing,
+          duration: med.duration
+        }))
+      }
+
+      const response = await fetch(`${cleanBase}/doctor/prescription/${editingPrescription.id}/update/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to update prescription: ${response.status}`)
+      }
+
+      // Refresh prescriptions
+      if (selectedPatient) {
+        await handlePatientSelect(selectedPatient)
+      }
+      
+      setShowEditModal(false)
+      setEditingPrescription(null)
+      alert('Prescription updated successfully!')
+    } catch (err) {
+      console.error('Error updating prescription:', err)
+      alert('Failed to update prescription: ' + err.message)
+    } finally {
+      setUpdateLoading(false)
+    }
+  }
+
+  // Medicine form handlers
+  const handleMedicineChange = (index, field, value) => {
+    const updatedMedicines = [...editForm.medicines]
+    updatedMedicines[index] = { ...updatedMedicines[index], [field]: value }
+    setEditForm({ ...editForm, medicines: updatedMedicines })
+  }
+
+  const addMedicine = () => {
+    setEditForm({
+      ...editForm,
+      medicines: [...editForm.medicines, { medicine_name: '', dose: '', frequency: 'once', timing: 'after_food', duration: '' }]
+    })
+  }
+
+  const removeMedicine = (index) => {
+    const updatedMedicines = editForm.medicines.filter((_, i) => i !== index)
+    setEditForm({ ...editForm, medicines: updatedMedicines })
+  }
+
+  const filteredPatients = patients.filter(patient =>
+    patient.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.mobile_number?.includes(searchTerm)
   )
 
   const handleAddRecord = (e) => {
@@ -227,7 +244,12 @@ export function OfflineEMR({ patientId }) {
     { icon: '🎥', label: 'Consultations', onClick: () => route('/doctor/consultations') },
   ]
 
-  console.log('Rendering OfflineEMR. PatientId:', patientId, 'SelectedPatient:', selectedPatient, 'FilteredPatients:', filteredPatients.length)
+  const getSignatureUrl = (signaturePath) => {
+    if (!signaturePath) return null
+    const cleanBase = BASE_URL.replace(/\/$/, '')
+    if (signaturePath.startsWith('http')) return signaturePath
+    return `${cleanBase}${signaturePath}`
+  }
 
   return (
     <div className={`min-h-screen ${isDark ? 'dark' : ''}`}>
@@ -244,10 +266,12 @@ export function OfflineEMR({ patientId }) {
               className="w-full bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-700 dark:to-gray-700 rounded-xl p-4 mb-6 hover:from-green-100 hover:to-emerald-100 dark:hover:from-gray-600 dark:hover:to-gray-600 transition-all"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">SJ</div>
+                <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">
+                  {user?.full_name?.charAt(0) || 'D'}
+                </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="font-semibold text-gray-900 dark:text-white truncate">Dr. Sarah Johnson</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Cardiologist</p>
+                  <p className="font-semibold text-gray-900 dark:text-white truncate">{user?.full_name || 'Doctor'}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{user?.specialization || 'Specialist'}</p>
                 </div>
               </div>
             </button>
@@ -312,19 +336,10 @@ export function OfflineEMR({ patientId }) {
                   >
                     {isDark ? '☀️' : '🌙'}
                   </button>
-                  <button className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 relative">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                  </button>
                   <button
                     onClick={() => route('/')}
                     className="hidden sm:flex items-center gap-2 bg-gray-600 dark:bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
                     Logout
                   </button>
                 </div>
@@ -340,36 +355,54 @@ export function OfflineEMR({ patientId }) {
                 <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Patients</h2>
                   
-                  {/* Search */}
                   <div className="mb-4">
                     <input
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Search patients..."
                     />
                   </div>
 
-                  {/* Patient List */}
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {filteredPatients.map(patient => (
-                      <div 
-                        key={patient.id}
-                        onClick={() => setSelectedPatient(patient)}
-                        className={`p-4 rounded-xl cursor-pointer transition-all ${
-                          selectedPatient?.id === patient.id 
-                            ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-300 dark:border-blue-700 shadow-md' 
-                            : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                        }`}
-                      >
-                        <h3 className="font-semibold text-gray-900 dark:text-white">{patient.name}</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{patient.age} years • {patient.gender}</p>
-                        <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">{patient.condition}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">Last visit: {patient.lastVisit}</p>
-                      </div>
-                    ))}
-                  </div>
+                  {loading && (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-gray-500 dark:text-gray-400 mt-2">Loading patients...</p>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="text-center py-8 text-red-500">
+                      <p>Error: {error}</p>
+                    </div>
+                  )}
+
+                  {!loading && !error && (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {filteredPatients.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <p>No patients found</p>
+                        </div>
+                      ) : (
+                        filteredPatients.map(patient => (
+                          <div 
+                            key={patient.id}
+                            onClick={() => handlePatientSelect(patient)}
+                            className={`p-4 rounded-xl cursor-pointer transition-all ${
+                              selectedPatient?.id === patient.id 
+                                ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-300 dark:border-blue-700 shadow-md' 
+                                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent'
+                            }`}
+                          >
+                            <h3 className="font-semibold text-gray-900 dark:text-white">{patient.full_name}</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{patient.age} years • {patient.gender}</p>
+                            <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">{patient.mobile_number}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -379,78 +412,93 @@ export function OfflineEMR({ patientId }) {
                   <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
                     <div className="flex items-center justify-between mb-6">
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPatient.name}</h2>
-                        <p className="text-gray-600 dark:text-gray-400">{selectedPatient.age} years • {selectedPatient.gender} • {selectedPatient.phone}</p>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPatient.full_name}</h2>
+                        <p className="text-gray-600 dark:text-gray-400">{selectedPatient.age} years • {selectedPatient.gender} • {selectedPatient.mobile_number}</p>
                       </div>
-                      <span className="bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 text-blue-800 dark:text-blue-300 px-4 py-2 rounded-full text-sm font-semibold border-2 border-blue-200 dark:border-blue-700">
-                        {selectedPatient.condition}
-                      </span>
                     </div>
 
-                    {/* Medical Records */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        Medical Records
+                        Prescriptions
                       </h3>
+
+                      {prescriptionLoading && (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                          <p className="text-gray-500 dark:text-gray-400 mt-2">Loading prescriptions...</p>
+                        </div>
+                      )}
                       
-                      {(mockRecords[selectedPatient.id] || []).map(record => (
-                        <div key={record.id} className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 border-2 border-gray-200 dark:border-gray-600 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-700 transition-all">
+                      {!prescriptionLoading && prescriptions.map(prescription => (
+                        <div key={prescription.id} className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 border-2 border-gray-200 dark:border-gray-600 rounded-xl p-4">
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                               <span className="text-blue-600 dark:text-blue-400">📅</span>
-                              Visit - {record.date}
+                              {new Date(prescription.created_at).toLocaleDateString()}
                             </h4>
-                            <button className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium transition-colors">
-                              Edit
+                            <button 
+                              onClick={() => handleEditPrescription(prescription)}
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium transition-colors px-3 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-lg"
+                            >
+                              ✏️ Edit
                             </button>
                           </div>
                       
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                             <div className="bg-white dark:bg-gray-800 p-3 rounded-lg">
                               <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                                <span className="text-red-500">🩺</span>
-                                Symptoms
+                                <span className="text-blue-500">🔬</span>Diagnosis
                               </h5>
-                              <p className="text-gray-600 dark:text-gray-400">{record.symptoms}</p>
+                              <p className="text-gray-600 dark:text-gray-400">{prescription.diagnosis}</p>
                             </div>
                             <div className="bg-white dark:bg-gray-800 p-3 rounded-lg">
                               <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                                <span className="text-blue-500">🔬</span>
-                                Diagnosis
+                                <span className="text-yellow-500">📝</span>Notes
                               </h5>
-                              <p className="text-gray-600 dark:text-gray-400">{record.diagnosis}</p>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg">
-                              <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                                <span className="text-green-500">💊</span>
-                                Prescription
-                              </h5>
-                              <p className="text-gray-600 dark:text-gray-400">{record.prescription}</p>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg">
-                              <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                                <span className="text-yellow-500">📝</span>
-                                Notes
-                              </h5>
-                              <p className="text-gray-600 dark:text-gray-400">{record.notes}</p>
+                              <p className="text-gray-600 dark:text-gray-400">{prescription.additional_notes || 'No additional notes'}</p>
                             </div>
                           </div>
+
+                          {prescription.medicines && prescription.medicines.length > 0 && (
+                            <div className="mt-4">
+                              <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                <span className="text-green-500">💊</span>Medicines
+                              </h5>
+                              <div className="space-y-2">
+                                {prescription.medicines.map(medicine => (
+                                  <div key={medicine.id} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+                                    <p className="font-medium text-gray-900 dark:text-white">{medicine.medicine_name}</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                      {medicine.dose} • {FREQUENCY_OPTIONS.find(f => f.key === medicine.frequency)?.value || medicine.frequency} • {TIMING_OPTIONS.find(t => t.key === medicine.timing)?.value || medicine.timing} • {medicine.duration}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {prescription.digital_signature && (
+                            <div className="mt-4">
+                              <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                <span className="text-purple-500">✍️</span>Digital Signature
+                              </h5>
+                              <img 
+                                src={getSignatureUrl(prescription.digital_signature)} 
+                                alt="Doctor's Signature" 
+                                className="h-16 object-contain bg-white dark:bg-gray-700 p-2 rounded-lg border border-gray-200 dark:border-gray-600"
+                              />
+                            </div>
+                          )}
                         </div>
                       ))}
 
-                      {(!mockRecords[selectedPatient.id] || mockRecords[selectedPatient.id].length === 0) && (
+                      {!prescriptionLoading && prescriptions.length === 0 && (
                         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                           <div className="text-4xl mb-4">📋</div>
-                          <p>No medical records found for this patient</p>
-                          <button 
-                            onClick={() => setShowAddRecord(true)}
-                            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-                          >
-                            Add First Record
-                          </button>
+                          <p>No prescriptions found for this patient</p>
                         </div>
                       )}
                     </div>
@@ -459,13 +507,163 @@ export function OfflineEMR({ patientId }) {
                   <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-8 text-center">
                     <div className="text-gray-400 dark:text-gray-600 text-6xl mb-4">👥</div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Select a Patient</h3>
-                    <p className="text-gray-600 dark:text-gray-400">Choose a patient from the list to view their medical records</p>
+                    <p className="text-gray-600 dark:text-gray-400">Choose a patient from the list to view their prescriptions</p>
                   </div>
                 )}
               </div>
             </div>
           </main>
         </div>
+
+        {/* Edit Prescription Modal */}
+        {showEditModal && editingPrescription && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border-2 border-gray-200 dark:border-gray-700">
+              <div className="sticky top-0 bg-white dark:bg-gray-800 p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <span className="text-blue-600">✏️</span>Edit Prescription
+                </h3>
+              </div>
+              
+              <form onSubmit={handleUpdatePrescription} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Diagnosis</label>
+                  <input
+                    type="text"
+                    value={editForm.diagnosis}
+                    onChange={(e) => setEditForm({ ...editForm, diagnosis: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter diagnosis..."
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Additional Notes</label>
+                  <textarea
+                    value={editForm.additional_notes}
+                    onChange={(e) => setEditForm({ ...editForm, additional_notes: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows="3"
+                    placeholder="Enter notes..."
+                  ></textarea>
+                </div>
+
+                {/* Medicines Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Medicines</label>
+                    <button
+                      type="button"
+                      onClick={addMedicine}
+                      className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition-colors"
+                    >
+                      + Add Medicine
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {editForm.medicines.map((medicine, index) => (
+                      <div key={index} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Medicine {index + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeMedicine(index)}
+                            className="text-red-500 hover:text-red-700 text-sm"
+                          >
+                            ❌ Remove
+                          </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Medicine Name</label>
+                            <input
+                              type="text"
+                              value={medicine.medicine_name}
+                              onChange={(e) => handleMedicineChange(index, 'medicine_name', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm"
+                              placeholder="Medicine name"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Dosage</label>
+                            <input
+                              type="text"
+                              value={medicine.dose}
+                              onChange={(e) => handleMedicineChange(index, 'dose', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm"
+                              placeholder="e.g. 500mg"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Frequency</label>
+                            <select
+                              value={medicine.frequency}
+                              onChange={(e) => handleMedicineChange(index, 'frequency', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm"
+                            >
+                              {FREQUENCY_OPTIONS.map(opt => (
+                                <option key={opt.key} value={opt.key}>{opt.value}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Timing</label>
+                            <select
+                              value={medicine.timing}
+                              onChange={(e) => handleMedicineChange(index, 'timing', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm"
+                            >
+                              {TIMING_OPTIONS.map(opt => (
+                                <option key={opt.key} value={opt.key}>{opt.value}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Duration (in days)</label>
+                            <input
+                              type="text"
+                              value={medicine.duration}
+                              onChange={(e) => handleMedicineChange(index, 'duration', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm"
+                              placeholder="e.g. 5 days"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {editForm.medicines.length === 0 && (
+                      <p className="text-center text-gray-500 dark:text-gray-400 py-4">No medicines added. Click "Add Medicine" to add one.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => { setShowEditModal(false); setEditingPrescription(null); }}
+                    className="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 py-2 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateLoading}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2 px-4 rounded-lg transition-colors font-medium"
+                  >
+                    {updateLoading ? 'Updating...' : 'Update Prescription'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Add Record Modal */}
         {showAddRecord && (
@@ -480,50 +678,31 @@ export function OfflineEMR({ patientId }) {
               
               <form onSubmit={handleAddRecord} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Patient
-                  </label>
-                  <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Patient</label>
+                  <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg">
                     <option value="">Select Patient</option>
-                    {mockPatients.map(patient => (
-                      <option key={patient.id} value={patient.id}>{patient.name}</option>
+                    {patients.map(patient => (
+                      <option key={patient.id} value={patient.id}>{patient.full_name}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Symptoms
-                  </label>
-                  <textarea
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows="3"
-                    placeholder="Describe symptoms..."
-                    required
-                  ></textarea>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Diagnosis
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Diagnosis</label>
                   <input
                     type="text"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg"
                     placeholder="Enter diagnosis..."
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Prescription
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Additional Notes</label>
                   <textarea
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows="2"
-                    placeholder="Enter prescription..."
-                    required
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg"
+                    rows="3"
+                    placeholder="Enter notes..."
                   ></textarea>
                 </div>
 

@@ -362,10 +362,11 @@ export default function ConsultationList() {
                           {item.status !== 'completed' && item.status !== 'cancelled' ? (
                             <button 
                               onClick={() => {
+                                // Open doctor_link directly in new tab
                                 if (item.doctorUrl) {
-                                  window.location.href = item.doctorUrl
+                                  window.open(item.doctorUrl, '_blank')
                                 } else {
-                                  alert('Consultation link not available')
+                                  alert('Video call link not available')
                                 }
                               }} 
                               className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-xl font-medium transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 whitespace-nowrap"

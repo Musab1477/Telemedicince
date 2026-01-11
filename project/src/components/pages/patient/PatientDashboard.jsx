@@ -145,9 +145,13 @@ export function PatientDashboard() {
     route('/patient/community')
   }
 
+  const handleHealthAgent = () => {
+    route('/patient/health-agent')
+  }
+
   // Get display data from profileData or user context
   const displayUser = profileData || user || {}
-  const displayName = displayUser.name || 'Patient'
+  const displayName = displayUser.first_name || 'Patient'
   const displayMobileNumber = profileData?.mobile_number || user?.mobile_number || 'N/A'
   const displayRole = profileData?.role || user?.role || 'patient'
 
@@ -157,6 +161,7 @@ export function PatientDashboard() {
     { icon: '🏥', label: 'Hospitals', active: false, onClick: handleHospitals },
     { icon: '📋', label: 'Health Records', active: false, onClick: handleHealthRecords },
     { icon: '👥', label: 'Community', active: false, onClick: handleCommunity },
+    { icon: '🤖', label: 'Health Agent', active: false, onClick: handleHealthAgent },
   ]
 
   if (isLoading && !profileData) {

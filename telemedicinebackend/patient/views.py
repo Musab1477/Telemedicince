@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from .models import *
@@ -8,6 +8,7 @@ from django.conf import settings
 from decimal import Decimal
 from .serializers import *
 from datetime import date
+from django.db import transaction
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -69,8 +70,8 @@ def verify_payment_and_create_appointment(request):
         
         room = generate_random_alphanumeric(10)
         
-        patient_url = f"https://1d28ac482789.ngrok-free.app/peer1/{room}"
-        doctor_url = f"https://1d28ac482789.ngrok-free.app/peer2/{room}"
+        patient_url = f"https://882cb53d146c.ngrok-free.app/peer1/{room}"
+        doctor_url = f"https://882cb53d146c.ngrok-free.app/peer2/{room}"
 
         appointment = Appointment.objects.create(
             doctor_id=data["doctor_id"],
@@ -252,3 +253,264 @@ def get_booked_appointments(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+        
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def get_or_create_prescription_by_doctor_link(request):
+
+    doctor_link = request.data.get("doctor_link")
+    diagnosis = request.data.get("diagnosis", "")
+    additional_notes = request.data.get("additional_notes", "")
+    medicines_data = request.data.get("medicines", [])
+
+    if not doctor_link:
+        return Response(
+            {"error": "doctor_link is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # 🔥 Normalize link
+    doctor_link = doctor_link.rstrip("/")
+
+    # 1️⃣ Fetch Appointment
+    try:
+        appointment = Appointment.objects.get(doctor_link=doctor_link)
+    except Appointment.DoesNotExist:
+        return Response(
+            {"error": "Appointment not found for given doctor_link"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # 🔐 Atomic transaction (safe)
+    with transaction.atomic():
+
+        # 2️⃣ Get or Create Prescription
+        prescription, created = Prescription.objects.get_or_create(
+            appointment=appointment
+        )
+
+        # 3️⃣ Update main prescription fields
+        prescription.diagnosis = diagnosis
+        prescription.additional_notes = additional_notes
+        prescription.digital_signature = appointment.doctor.digital_signature_certificate
+        prescription.save()
+
+        # 4️⃣ Medicines handling
+        if medicines_data:
+            medicines_bulk = []
+            for med in medicines_data:
+                medicines_bulk.append(
+                    PrescriptionMedicine(
+                        prescription=prescription,
+                        medicine_name=med.get("medicine_name"),
+                        dose=med.get("dose"),
+                        frequency=med.get("frequency"),
+                        timing=med.get("timing"),
+                        duration=med.get("duration"),
+                    )
+                )
+
+            PrescriptionMedicine.objects.bulk_create(medicines_bulk)
+
+    serializer = PrescriptionSerializer(prescription)
+
+    return Response(
+        {
+            "created": created,
+            "appointment_id": appointment.id,
+            "prescription": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )  
+    
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def upload_transcription_and_complete_appointment(request):
+    """
+    Body (multipart/form-data):
+    - doctor_link OR patient_link
+    - transcription_file (file)
+    """
+
+    link = request.data.get("link")
+    transcription_file = request.FILES.get("transcription_file")
+
+    if not link:
+        return Response(
+            {"error": "link is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # 🔥 Normalize links (remove last /)
+    if link:
+        link = link.rstrip("/")
+    
+    try:
+        appointment = Appointment.objects.get(doctor_link=link)
+        
+        if not appointment:
+            appointment = Appointment.objects.get(patient_link=link)
+        
+    except Appointment.DoesNotExist:
+        return Response(
+            {"error": "Appointment not found for given link"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # 2️⃣ Save transcription file
+    if transcription_file:
+        appointment.transcription_file = transcription_file
+
+    # 3️⃣ Mark appointment completed
+    appointment.status = "completed"
+    appointment.save()
+
+    return Response(
+        {
+            "message": "Transcription uploaded & appointment completed",
+            "appointment_id": appointment.id,
+            "status": appointment.status,
+            "transcription_file": appointment.transcription_file.url
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def patient_appointments_with_prescription(request):
+    user = request.user  # 👈 patient
+
+    # 1️⃣ Fetch appointments of logged-in patient
+    appointments = (
+        Appointment.objects
+        .filter(patient=user)
+        .select_related("doctor", "patient")
+        .prefetch_related("prescription__medicines")
+        .order_by("-appointment_date", "-start_time")
+    )
+
+    response_data = []
+
+    for appointment in appointments:
+        appointment_data = AppointmentSerializer(appointment).data
+
+        # 2️⃣ Try to fetch prescription
+        prescription = getattr(appointment, "prescription", None)
+
+        prescription_data = (
+            PrescriptionSerializer(prescription).data
+            if prescription else None
+        )
+
+        response_data.append({
+            "appointment": appointment_data,
+            "prescription": prescription_data
+        })
+
+    return Response(response_data)
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .models import Appointment
+from Authentication.models import User
+from .serializers import DoctorPatientSerializer
+
+class DoctorPatientListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, doctor_id):
+        patient_ids = Appointment.objects.filter(
+            doctor_id=doctor_id
+        ).values_list("patient_id", flat=True).distinct()
+
+        patients = User.objects.filter(id__in=patient_ids)
+
+        serializer = DoctorPatientSerializer(patients, many=True)
+        return Response({
+            "doctor_id": doctor_id,
+            "total_patients": patients.count(),
+            "patients": serializer.data
+        })
+
+
+class DoctorPatientPrescriptionAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, doctor_id, patient_id):
+        prescriptions = Prescription.objects.filter(
+            appointment__doctor_id=doctor_id,
+            appointment__patient_id=patient_id
+        ).select_related(
+            "appointment"
+        ).prefetch_related(
+            "medicines"
+        )
+
+        serializer = PrescriptionSerializer(prescriptions, many=True)
+
+        return Response({
+            "doctor_id": doctor_id,
+            "patient_id": patient_id,
+            "total_prescriptions": prescriptions.count(),
+            "prescriptions": serializer.data
+        })
+        
+        
+@api_view(["PUT"])
+@permission_classes([AllowAny])
+def update_prescription(request, prescription_id):
+
+    diagnosis = request.data.get("diagnosis", "")
+    additional_notes = request.data.get("additional_notes", "")
+    medicines_data = request.data.get("medicines", [])
+
+    # 1️⃣ Fetch Appointment
+    try:
+        prescription = Prescription.objects.get(id=prescription_id)
+        appointment = prescription.appointment
+    except Prescription.DoesNotExist:
+        return Response(
+            {"error": "Appointment not found for given doctor_link"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # 🔐 Atomic transaction (safe)
+    with transaction.atomic():
+
+        # 3️⃣ Update main prescription fields
+        prescription.diagnosis = diagnosis
+        prescription.additional_notes = additional_notes
+        prescription.digital_signature = appointment.doctor.digital_signature_certificate
+        prescription.save()
+        
+        prescription.medicines.all().delete()
+
+        # 4️⃣ Medicines handling
+        if medicines_data:
+            medicines_bulk = []
+            for med in medicines_data:
+                medicines_bulk.append(
+                    PrescriptionMedicine(
+                        prescription=prescription,
+                        medicine_name=med.get("medicine_name"),
+                        dose=med.get("dose"),
+                        frequency=med.get("frequency"),
+                        timing=med.get("timing"),
+                        duration=med.get("duration"),
+                    )
+                )
+
+            PrescriptionMedicine.objects.bulk_create(medicines_bulk)
+
+    serializer = PrescriptionSerializer(prescription)
+
+    return Response(
+        {
+            "appointment_id": appointment.id,
+            "prescription": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )  

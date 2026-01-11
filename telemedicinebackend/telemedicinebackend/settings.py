@@ -47,8 +47,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 
 CORS_ALLOWED_ORIGINS = [
-    "http://192.168.1.5:3000",
     "http://localhost:3000",  # React + Vite  dev
+    "https://b93e810dbec1.ngrok-free.app",
+    # "http://192.168.1.5:3000",
     # "http://172.20.10.2:3000",
     # "https://33af6d8ffd5e.ngrok-free.app"
 ]

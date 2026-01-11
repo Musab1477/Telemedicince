@@ -31,6 +31,7 @@ import { IndependentPractice } from './components/pages/doctor/IndependentPracti
 import { ConsultationRoom } from './components/pages/doctor/ConsultationRoom'
 import ConsultationList from './components/pages/doctor/ConsultationList'
 import ConsultationSummary from './components/pages/doctor/ConsultationSummary'
+import VideoConsultation from './components/pages/doctor/VideoConsultation'
 
 // Hospital pages
 import { HospitalLogin } from './components/pages/hospital/HospitalLogin'
@@ -56,6 +57,7 @@ import DoctorProfileSelf from './components/pages/doctor/DoctorProfile'
 import HospitalDetails from './components/pages/patient/HospitalDetails'
 import { SideBar } from './components/ui/SideBar'
 import FormBuilder from './components/pages/hospital/FormBuilder'
+import HealthAgent from './components/pages/patient/HealthAgent'
 import N8nChatLoader from './components/pages/patient/N8nChatLoader'
 
 
@@ -85,6 +87,7 @@ export function App() {
         <Route path="/patient/reports" component={Reports} />
         <Route path="/patient/community/:id" component={GroupPage} />
         <Route path="/patient/community" component={Community} />
+        <Route path="/patient/health-agent" component={HealthAgent} />
         
         {/* Doctor Routes */}
         <Route path="/doctor/login" component={DoctorLogin} />
@@ -94,6 +97,7 @@ export function App() {
         <Route path="/doctor/emr" component={OfflineEMR} />
         <Route path="/doctor/prescriptions" component={Prescriptions} />
         <Route path="/doctor/consultations" component={ConsultationList} />
+        <Route path="/doctor/video-consultation/:appointmentId" component={VideoConsultation} />
         <Route path="/doctor/consultationRoom" component={ConsultationRoom} />
         <Route path="/doctor/consultation-summary/:id" component={ConsultationSummary} />
         <Route path="/verification-pending" component={VerificationPendingPage} />
