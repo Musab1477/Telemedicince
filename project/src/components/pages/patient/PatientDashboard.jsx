@@ -159,6 +159,8 @@ export function PatientDashboard() {
 
   const handleHealthAgent = () => {
     route('/patient/health-agent')
+  }
+
   const handleNGOs = () => {
     route('/patient/ngos')
   }
@@ -581,3 +583,5 @@ function ProfileAvatar() {
     </button>
   )
 }
+
+export default PatientDashboard;
