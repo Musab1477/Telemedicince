@@ -131,11 +131,16 @@ export function AppRouter() {
         </ProtectedRoute>
       )} />
 
-      <Route path="/doctor/profile" component={() => (
-        <ProtectedRoute requiredRole={USER_ROLES.DOCTOR}>
-          <DoctorSelfProfile />
-        </ProtectedRoute>
-      )} />
+      <Route path="/doctor/profile/:id" component={({ id }) => {
+        console.log('🔥 Route matched! id:', id)
+        return <DoctorSelfProfile id={id} />
+      }} />
+      
+      {/* Fallback for /doctor/profile without ID */}
+      <Route path="/doctor/profile" component={() => {
+        console.log('🔥 Route matched! (no id)')
+        return <DoctorSelfProfile />
+      }} />
 
       <Route path="/patient/appointments" component={() => (
         <ProtectedRoute requiredRole={USER_ROLES.PATIENT}>

@@ -2,11 +2,22 @@ import { useState, useEffect } from 'preact/hooks'
 import { useAuth } from '../../../contexts/AuthContext'
 import { route } from 'preact-router'
 
-export default function DoctorProfile() {
+export default function DoctorProfile(props) {
+  // DEBUG: Log immediately when component function is called
+  console.log('🚀 DoctorProfile COMPONENT CALLED!')
+  console.log('🚀 All props received:', props)
+  console.log('🚀 props.id:', props.id)
+  console.log('🚀 props.doctorId:', props.doctorId)
+  
+  // Extract doctorId from either props.doctorId or props.id (depends on router)
+  const doctorId = props.doctorId || props.id
   const { user, login } = useAuth()
   const [editing, setEditing] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDark, setIsDark] = useState(false)
+  const [doctorDetails, setDoctorDetails] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
   
   useEffect(() => {
     const darkMode = localStorage.getItem('darkMode') === 'true'
@@ -14,7 +25,125 @@ export default function DoctorProfile() {
     if (darkMode) {
       document.documentElement.classList.add('dark')
     }
+    
+    // Fetch doctor details when component loads
+    console.log('🔍 DoctorProfile mounted, fetching details...')
+    fetchDoctorDetails()
   }, [])
+
+  const fetchDoctorDetails = async () => {
+    setIsLoading(true)
+    try {
+      const token = localStorage.getItem('accessToken')
+      console.log('🔑 Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'NULL/EMPTY')
+      
+      if (!token) {
+        console.error('❌ No access token found in localStorage!')
+        setError('Authentication required. Please login again.')
+        setIsLoading(false)
+        return
+      }
+      
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+      
+      // Store baseUrl for later use in document URLs
+      localStorage.setItem('apiBaseUrl', baseUrl)
+      
+      // Step 1: Get logged-in user's profile to get their ID
+      console.log('📡 Step 1: Fetching logged-in user profile from:', `${apiUrl}auth/profile/`)
+      
+      const profileResponse = await fetch(`${apiUrl}auth/profile/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (!profileResponse.ok) {
+        const errorData = await profileResponse.json().catch(() => ({}))
+        console.error('❌ Profile API error:', profileResponse.status, errorData)
+        setError('Failed to fetch user profile')
+        setIsLoading(false)
+        return
+      }
+      
+      const profileData = await profileResponse.json()
+      console.log('✅ Logged-in user profile:', profileData)
+      const loggedInUserId = profileData.id
+      console.log('🆔 Logged-in user ID:', loggedInUserId)
+      
+      // Step 2: Try to get all doctors list with full details
+      console.log('📡 Step 2: Fetching all doctors from:', `${apiUrl}auth/get-doctor-list/`)
+      
+      try {
+        const doctorListResponse = await fetch(`${apiUrl}auth/get-doctor-list/`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        
+        if (doctorListResponse.ok) {
+          const doctorListData = await doctorListResponse.json()
+          console.log('✅ All doctors list:', doctorListData)
+          
+          // Step 3: Find the doctor matching logged-in user's ID
+          const doctorList = Array.isArray(doctorListData) ? doctorListData : (doctorListData.doctors || [])
+          const matchedDoctor = doctorList.find(doc => doc.id === loggedInUserId)
+          
+          if (matchedDoctor) {
+            console.log('✅ Found matching doctor details:', matchedDoctor)
+            setDoctorDetails(matchedDoctor)
+            return
+          } else {
+            console.warn('⚠️ No doctor found with ID:', loggedInUserId, '- falling back to profile data')
+          }
+        } else {
+          const errorData = await doctorListResponse.json().catch(() => ({}))
+          console.warn('⚠️ Doctor list API error:', doctorListResponse.status, errorData.message || errorData)
+          console.log('📋 Falling back to profile data...')
+        }
+      } catch (listErr) {
+        console.warn('⚠️ Error fetching doctor list:', listErr.message)
+        console.log('📋 Falling back to profile data...')
+      }
+      
+      // Fallback: Use profile data if doctor list API fails
+      console.log('✅ Using profile data as fallback:', profileData)
+      setDoctorDetails(profileData)
+      
+    } catch (err) {
+      console.error('❌ Error fetching doctor details:', err)
+      setError(err.message || 'Failed to fetch doctor details')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Helper function to construct full document URL
+  const getDocumentUrl = (docPath) => {
+    if (!docPath) return null
+    if (docPath.startsWith('http')) return docPath // Already full URL
+    const baseUrl = localStorage.getItem('apiBaseUrl') || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+    return cleanBaseUrl + (docPath.startsWith('/') ? docPath.substring(1) : docPath)
+  }
+
+  // Helper function to get file extension
+  const getFileExtension = (url) => {
+    if (!url) return ''
+    const path = url.split('?')[0] // Remove query params
+    return path.split('.').pop().toLowerCase()
+  }
+
+  // Helper function to check if document is image
+  const isImageDocument = (url) => {
+    const ext = getFileExtension(url)
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)
+  }
 
   const toggleDarkMode = () => {
     const newMode = !isDark
@@ -27,18 +156,88 @@ export default function DoctorProfile() {
     }
   }
 
-  const [form, setForm] = useState(() => ({
-    name: user?.name || '',
-    phone: user?.phone || '',
-    email: user?.email || '',
-    medicalLicense: user?.medicalLicense || '',
-    specialization: user?.specialization || '',
-    qualifications: user?.qualifications || '',
-    experienceYears: user?.experienceYears || '',
-    clinic: user?.clinic || '',
-    hospitalType: user?.hospitalType || 'private',
-    about: user?.about || ''
-  }))
+  const handleLogout = async () => {
+    const confirmLogout = confirm('Are you sure you want to logout?')
+    if (!confirmLogout) return
+
+    setIsLoading(true)
+    try {
+      console.log('🚪 Logging out doctor...')
+      const token = localStorage.getItem('accessToken')
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+      
+      const response = await fetch(`${apiUrl}auth/logout/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      const data = await response.json()
+      console.log('✅ Doctor Logout Success:', data)
+      
+      // Clear all stored data
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('apiBaseUrl')
+      
+      alert('✅ Logged out successfully!')
+      route('/')
+    } catch (err) {
+      console.error('❌ Logout Error:', err)
+      
+      // Still clear data even if API fails
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('apiBaseUrl')
+      
+      alert('Logged out (with error, but cleared local data)')
+      route('/')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    medicalLicense: '',
+    specialization: '',
+    qualifications: '',
+    experienceYears: '',
+    clinic: '',
+    hospitalType: 'private',
+    hospitalAddress: '',
+    consultationFee: '',
+    about: ''
+  })
+
+  // Update form when doctorDetails changes
+  useEffect(() => {
+    if (doctorDetails) {
+      setForm({
+        name: doctorDetails?.first_name ? `${doctorDetails.first_name} ${doctorDetails.last_name}` : '',
+        phone: doctorDetails?.mobile_number || '',
+        email: doctorDetails?.email || '',
+        medicalLicense: doctorDetails?.doctor_license_number || '',
+        specialization: doctorDetails?.specialization || '',
+        qualifications: doctorDetails?.highest_qualification || '',
+        experienceYears: doctorDetails?.years_of_experience || '',
+        clinic: doctorDetails?.current_hospital || '',
+        hospitalType: doctorDetails?.hospital_type || 'private',
+        hospitalAddress: doctorDetails?.hospital_address || '',
+        consultationFee: doctorDetails?.consultation_fee || '',
+        about: doctorDetails?.about || ''
+      })
+    }
+  }, [doctorDetails])
 
   const [documents, setDocuments] = useState({
     degreeFiles: [],
@@ -83,19 +282,21 @@ export default function DoctorProfile() {
   const menuItems = [
     { icon: '🏠', label: 'Dashboard', onClick: () => route('/doctor/dashboard') },
     { icon: '📅', label: 'Schedule', onClick: () => route('/doctor/schedule') },
-    { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
+    // { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
     { icon: '💊', label: 'Prescriptions', onClick: () => route('/doctor/prescriptions') },
     { icon: '🎥', label: 'Consultations', onClick: () => route('/doctor/consultations') },
-    { icon: '👤', label: 'Profile', active: true, onClick: () => {} },
+    // { icon: '👤', label: 'Profile', active: true, onClick: () => {} },
   ]
 
-  console.log('DoctorProfile - User:', user)
+  console.log('DoctorProfile - doctorDetails:', doctorDetails)
   
-  const initial = (user?.name || user?.phone || 'D')[0]?.toUpperCase()
+  const initial = (doctorDetails?.first_name || doctorDetails?.phone || form.name || 'D')[0]?.toUpperCase()
 
   return (
     <div className={`min-h-screen ${isDark ? 'dark' : ''}`}>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+        {/* DEBUG: Show doctorId */}
+
         {/* Sidebar */}
         <aside className={`fixed top-0 left-0 z-40 w-64 h-screen transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700`}>
           <div className="h-full px-3 py-4 overflow-y-auto">
@@ -113,9 +314,11 @@ export default function DoctorProfile() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 dark:text-white truncate">
-                    {user?.name || 'Doctor'}
+                    {doctorDetails?.first_name && doctorDetails?.last_name 
+                      ? `Dr. ${doctorDetails.first_name} ${doctorDetails.last_name}` 
+                      : form.name || 'Doctor'}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{user?.specialization || 'Physician'}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{doctorDetails?.specialization || form.specialization || 'Physician'}</p>
                 </div>
               </div>
             </div>
@@ -140,12 +343,9 @@ export default function DoctorProfile() {
 
             {/* Dark Mode Toggle */}
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={toggleDarkMode}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-              >
-                <span className="text-xl">{isDark ? '☀️' : '🌙'}</span>
-                <span className="text-sm">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+              <button className="w-full bg-red-500 hover:bg-red-600 text-white rounded-lg px-4 py-3 flex items-center justify-center gap-2 font-medium transition-colors">
+                <span className="text-xl">🚨</span>
+                <span className="text-sm">Emergency: 108</span>
               </button>
             </div>
           </div>
@@ -171,18 +371,48 @@ export default function DoctorProfile() {
                     <p className="text-sm text-gray-600 dark:text-gray-400">Manage your professional information</p>
                   </div>
                 </div>
-                <button
-                  onClick={toggleDarkMode}
-                  className="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <span className="text-2xl">{isDark ? '☀️' : '🌙'}</span>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={toggleDarkMode}
+                    className="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <span className="text-2xl">{isDark ? '☀️' : '🌙'}</span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="hidden sm:flex items-center gap-2 bg-gray-600 dark:bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Logout
+                  </button>
+                </div>
               </div>
             </div>
           </header>
 
           {/* Profile Content */}
           <div className="p-4 sm:p-6 lg:p-8">
+            {isLoading ? (
+              <div className="max-w-5xl mx-auto text-center py-20">
+                <div className="text-6xl mb-4 animate-spin">⏳</div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Loading profile...</h3>
+                <p className="text-gray-600 dark:text-gray-400">Please wait while we fetch your details</p>
+              </div>
+            ) : error ? (
+              <div className="max-w-5xl mx-auto text-center py-20">
+                <div className="text-6xl mb-4">⚠️</div>
+                <h3 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-2">Error</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
+                <button 
+                  onClick={() => route('/doctor/dashboard')}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                >
+                  Back to Dashboard
+                </button>
+              </div>
+            ) : (
             <div className="max-w-5xl mx-auto space-y-6">
               {/* Profile Header Card */}
               <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
@@ -204,14 +434,14 @@ export default function DoctorProfile() {
                     </div>
                   </div>
                   <div className="flex-1 text-center sm:text-left">
-                    <h2 className="text-3xl font-bold mb-2">{user?.name || 'Doctor'}</h2>
-                    <p className="text-green-100 text-lg mb-2">{user?.specialization || 'Physician'}</p>
+                    <h2 className="text-3xl font-bold mb-2">{doctorDetails?.first_name && doctorDetails?.last_name ? `Dr. ${doctorDetails.first_name} ${doctorDetails.last_name}` : form.name || 'Doctor'}</h2>
+                    <p className="text-green-100 text-lg mb-2">{doctorDetails?.specialization || form.specialization || 'Physician'}</p>
                     <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                       <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium">
-                        {user?.experienceYears || '0'} Years Experience
+                        {doctorDetails?.years_of_experience || form.experienceYears || '0'} Years Experience
                       </span>
                       <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium">
-                        {user?.qualifications || 'MBBS'}
+                        {doctorDetails?.highest_qualification || form.qualifications || 'MBBS'}
                       </span>
                     </div>
                   </div>
@@ -253,13 +483,13 @@ export default function DoctorProfile() {
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
                           <span>📧</span> Email
                         </div>
-                        <div className="text-base font-semibold text-gray-900 dark:text-white">{user?.email || '-'}</div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">{doctorDetails?.email || form.email || '-'}</div>
                       </div>
                       <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
                           <span>📱</span> Phone
                         </div>
-                        <div className="text-base font-semibold text-gray-900 dark:text-white">{user?.phone || '-'}</div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">{doctorDetails?.mobile_number || form.phone || '-'}</div>
                       </div>
                     </div>
                   </div>
@@ -277,31 +507,37 @@ export default function DoctorProfile() {
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
                           <span>🎓</span> Specialization
                         </div>
-                        <div className="text-base font-semibold text-gray-900 dark:text-white">{user?.specialization || '-'}</div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">{doctorDetails?.specialization || form.specialization || '-'}</div>
                       </div>
                       <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800">
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
                           <span>📜</span> Qualifications
                         </div>
-                        <div className="text-base font-semibold text-gray-900 dark:text-white">{user?.qualifications || '-'}</div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">{doctorDetails?.highest_qualification || form.qualifications || '-'}</div>
                       </div>
                       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-4 rounded-xl border border-indigo-200 dark:border-indigo-800">
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
                           <span>⏱️</span> Experience
                         </div>
-                        <div className="text-base font-semibold text-gray-900 dark:text-white">{user?.experienceYears || '0'} Years</div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">{doctorDetails?.years_of_experience || form.experienceYears || '0'} Years</div>
                       </div>
                       <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
                           <span>🏥</span> Hospital Type
                         </div>
-                        <div className="text-base font-semibold text-gray-900 dark:text-white capitalize">{user?.hospitalType || 'Private'}</div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white capitalize">{doctorDetails?.hospital_type || form.hospitalType || 'Private'}</div>
                       </div>
-                      <div className="bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20 p-4 rounded-xl border border-rose-200 dark:border-rose-800 sm:col-span-2">
+                      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
+                          <span>💰</span> Consultation Fee
+                        </div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">₹{doctorDetails?.consultation_fee || form.consultationFee || '0'}</div>
+                      </div>
+                      <div className="bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20 p-4 rounded-xl border border-rose-200 dark:border-rose-800">
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
                           <span>🔖</span> Medical License Number
                         </div>
-                        <div className="text-base font-semibold text-gray-900 dark:text-white">{user?.medicalLicense || '-'}</div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">{doctorDetails?.doctor_license_number || form.medicalLicense || '-'}</div>
                       </div>
                     </div>
                   </div>
@@ -314,8 +550,19 @@ export default function DoctorProfile() {
                       </svg>
                       Clinic / Hospital
                     </h3>
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
-                      <div className="text-base font-semibold text-gray-900 dark:text-white">{user?.clinic || 'Not specified'}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
+                          <span>🏥</span> Current Hospital
+                        </div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">{doctorDetails?.current_hospital || form.clinic || 'Not specified'}</div>
+                      </div>
+                      <div className="bg-gradient-to-r from-cyan-50 to-sky-50 dark:from-cyan-900/20 dark:to-sky-900/20 p-4 rounded-xl border border-cyan-200 dark:border-cyan-800">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
+                          <span>📍</span> Hospital Address
+                        </div>
+                        <div className="text-base font-semibold text-gray-900 dark:text-white">{doctorDetails?.hospital_address || form.hospitalAddress || 'Not specified'}</div>
+                      </div>
                     </div>
                   </div>
 
@@ -328,87 +575,153 @@ export default function DoctorProfile() {
                       Registration Documents
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Degree Document */}
                       <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 p-4 rounded-xl border border-indigo-200 dark:border-indigo-800">
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
-                          <span>🎓</span> Degree Certificates
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-2">
+                          <span>🎓</span> Degree Certificate
                         </div>
-                        {user?.documents?.degreeFiles && user.documents.degreeFiles.length > 0 ? (
-                          <div className="space-y-1">
-                            {user?.documents.degreeFiles.map((file, idx) => (
-                              <div key={idx} className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                                {file}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
-                        )}
-                      </div>
-                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
-                          <span>📄</span> Additional Certificates
-                        </div>
-                        {user?.documents?.certificateFiles && user.documents.certificateFiles.length > 0 ? (
-                          <div className="space-y-1">
-                            {user?.documents.certificateFiles.map((file, idx) => (
-                              <div key={idx} className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                                {file}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
-                        )}
-                      </div>
-                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 rounded-xl border border-green-200 dark:border-green-800">
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
-                          <span>🔖</span> License Scan
-                        </div>
-                        {user?.documents?.licenseScan ? (
-                          <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                            {user?.documents.licenseScan}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
-                        )}
-                      </div>
-                      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800">
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
-                          <span>🆔</span> ID Proof
-                        </div>
-                        {user?.documents?.idProof ? (
-                          <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                            {user?.documents.idProof}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
-                        )}
-                      </div>
-                      <div className="bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20 p-4 rounded-xl border border-rose-200 dark:border-rose-800 sm:col-span-2">
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
-                          <span>✍️</span> Digital Signature
-                        </div>
-                        {user?.digitalSignatureUrl ? (
-                          <div className="flex items-center gap-4">
-                            <img src={user?.digitalSignatureUrl} alt="Digital Signature" className="h-16 bg-white dark:bg-gray-700 p-2 rounded-lg border border-gray-300 dark:border-gray-600" />
-                            <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        {doctorDetails?.degree_document ? (
+                          <div className="space-y-2">
+                            {isImageDocument(doctorDetails.degree_document) && (
+                              <img 
+                                src={getDocumentUrl(doctorDetails.degree_document)} 
+                                alt="Degree" 
+                                className="w-full h-24 object-cover rounded-lg border border-indigo-300 dark:border-indigo-600" 
+                              />
+                            )}
+                            <a 
+                              href={getDocumentUrl(doctorDetails.degree_document)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-3 py-2 rounded-lg font-medium hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                               </svg>
-                              Signature uploaded
-                            </div>
+                              View Document
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
+                        )}
+                      </div>
+                      
+                      {/* Other Certificates */}
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-2">
+                          <span>📄</span> Other Certificates
+                        </div>
+                        {doctorDetails?.other_certificate_document ? (
+                          <div className="space-y-2">
+                            {isImageDocument(doctorDetails.other_certificate_document) && (
+                              <img 
+                                src={getDocumentUrl(doctorDetails.other_certificate_document)} 
+                                alt="Certificate" 
+                                className="w-full h-24 object-cover rounded-lg border border-purple-300 dark:border-purple-600" 
+                              />
+                            )}
+                            <a 
+                              href={getDocumentUrl(doctorDetails.other_certificate_document)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-3 py-2 rounded-lg font-medium hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                              View Document
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
+                        )}
+                      </div>
+                      
+                      {/* Medical License */}
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 rounded-xl border border-green-200 dark:border-green-800">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-2">
+                          <span>🔖</span> Medical License
+                        </div>
+                        {doctorDetails?.medical_license_document ? (
+                          <div className="space-y-2">
+                            {isImageDocument(doctorDetails.medical_license_document) && (
+                              <img 
+                                src={getDocumentUrl(doctorDetails.medical_license_document)} 
+                                alt="License" 
+                                className="w-full h-24 object-cover rounded-lg border border-green-300 dark:border-green-600" 
+                              />
+                            )}
+                            <a 
+                              href={getDocumentUrl(doctorDetails.medical_license_document)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-2 rounded-lg font-medium hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                              View Document
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
+                        )}
+                      </div>
+                      
+                      {/* Address Proof / ID Proof */}
+                      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-2">
+                          <span>🆔</span> Address Proof / ID
+                        </div>
+                        {doctorDetails?.address_proof_document ? (
+                          <div className="space-y-2">
+                            {isImageDocument(doctorDetails.address_proof_document) && (
+                              <img 
+                                src={getDocumentUrl(doctorDetails.address_proof_document)} 
+                                alt="Address Proof" 
+                                className="w-full h-24 object-cover rounded-lg border border-yellow-300 dark:border-yellow-600" 
+                              />
+                            )}
+                            <a 
+                              href={getDocumentUrl(doctorDetails.address_proof_document)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 px-3 py-2 rounded-lg font-medium hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                              View Document
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
+                        )}
+                      </div>
+                      
+                      {/* Digital Signature */}
+                      <div className="bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20 p-4 rounded-xl border border-rose-200 dark:border-rose-800 sm:col-span-2">
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-2">
+                          <span>✍️</span> Digital Signature Certificate
+                        </div>
+                        {doctorDetails?.digital_signature_certificate ? (
+                          <div className="flex items-center gap-4">
+                            <img 
+                              src={getDocumentUrl(doctorDetails.digital_signature_certificate)} 
+                              alt="Digital Signature" 
+                              className="h-16 bg-white dark:bg-gray-700 p-2 rounded-lg border border-gray-300 dark:border-gray-600" 
+                            />
+                            <a 
+                              href={getDocumentUrl(doctorDetails.digital_signature_certificate)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-3 py-2 rounded-lg font-medium hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                              View Signature
+                            </a>
                           </div>
                         ) : (
                           <div className="text-sm text-gray-500 dark:text-gray-400">Not uploaded</div>
@@ -426,7 +739,7 @@ export default function DoctorProfile() {
                       About
                     </h3>
                     <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 p-4 rounded-xl border border-orange-200 dark:border-orange-800">
-                      <p className="text-gray-900 dark:text-white whitespace-pre-wrap">{user?.about || 'No information provided'}</p>
+                      <p className="text-gray-900 dark:text-white whitespace-pre-wrap">{doctorDetails?.about || form.about || 'No information provided'}</p>
                     </div>
                   </div>
                 </>
@@ -693,6 +1006,7 @@ export default function DoctorProfile() {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
 

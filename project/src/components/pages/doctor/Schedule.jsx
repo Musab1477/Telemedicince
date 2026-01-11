@@ -6,6 +6,7 @@ export function Schedule() {
   const [viewMode, setViewMode] = useState('check') // 'check', 'week' or 'day'
   const [isDark, setIsDark] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [profileData, setProfileData] = useState(null)
   
   // Check Schedule API data
   const [scheduleData, setScheduleData] = useState([])
@@ -22,7 +23,33 @@ export function Schedule() {
     
     // Fetch schedule data when component loads
     fetchScheduleData()
+    // Fetch doctor profile
+    fetchDoctorProfile()
   }, [])
+
+  const fetchDoctorProfile = async () => {
+    try {
+      const token = localStorage.getItem('accessToken')
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+      
+      const response = await fetch(`${apiUrl}auth/profile/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setProfileData(data)
+        console.log('✅ Profile loaded:', data)
+      }
+    } catch (err) {
+      console.error('❌ Profile fetch error:', err)
+    }
+  }
 
   // Update selectedDate when switching to day view
   useEffect(() => {
@@ -39,6 +66,52 @@ export function Schedule() {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
+    }
+  }
+
+  const handleLogout = async () => {
+    const confirmLogout = confirm('Are you sure you want to logout?')
+    if (!confirmLogout) return
+
+    setIsLoadingSchedule(true)
+    try {
+      console.log('🚪 Logging out doctor...')
+      const token = localStorage.getItem('accessToken')
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+      
+      const response = await fetch(`${apiUrl}auth/logout/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      const data = await response.json()
+      console.log('✅ Doctor Logout Success:', data)
+      
+      // Clear all stored data
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      
+      alert('✅ Logged out successfully!')
+      route('/')
+    } catch (err) {
+      console.error('❌ Logout Error:', err)
+      
+      // Still clear data even if API fails
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      
+      alert('Logged out (with error, but cleared local data)')
+      route('/')
+    } finally {
+      setIsLoadingSchedule(false)
     }
   }
 
@@ -571,7 +644,7 @@ export function Schedule() {
   const menuItems = [
     { icon: '🏠', label: 'Dashboard', onClick: () => route('/doctor/dashboard') },
     { icon: '📅', label: 'Schedule', active: true, onClick: () => {} },
-    { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
+    // { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
     { icon: '💊', label: 'Prescriptions', onClick: () => route('/doctor/prescriptions') },
     { icon: '🎥', label: 'Consultations', onClick: () => route('/doctor/consultations') },
   ]
@@ -587,14 +660,18 @@ export function Schedule() {
               <h2 className="text-xl font-bold text-green-600 dark:text-green-400">SwasthLink</h2>
             </div>
             <button 
-              onClick={() => route('/doctor/profile')}
+              onClick={() => profileData?.id && route(`/doctor/profile/${profileData.id}`)}
               className="w-full bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-700 dark:to-gray-700 rounded-xl p-4 mb-6 hover:from-green-100 hover:to-emerald-100 dark:hover:from-gray-600 dark:hover:to-gray-600 transition-all"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">SJ</div>
+                <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">
+                  {profileData?.first_name ? profileData.first_name.charAt(0).toUpperCase() : 'D'}
+                </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="font-semibold text-gray-900 dark:text-white truncate">Dr. Sarah Johnson</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Cardiologist</p>
+                  <p className="font-semibold text-gray-900 dark:text-white truncate">Dr. {profileData?.first_name} {profileData?.last_name}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    {profileData?.role ? profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1) : 'Doctor'}
+                  </p>
                 </div>
               </div>
             </button>
@@ -614,7 +691,7 @@ export function Schedule() {
                 </button>
               ))}
             </nav>
-            <div className="mt-auto pt-6">
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
               <button className="w-full bg-red-500 hover:bg-red-600 text-white rounded-lg px-4 py-3 flex items-center justify-center gap-2 font-medium transition-colors">
                 <span className="text-xl">🚨</span>
                 <span className="text-sm">Emergency: 108</span>
@@ -689,7 +766,7 @@ export function Schedule() {
                     <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                   </button>
                   <button
-                    onClick={() => route('/')}
+                    onClick={handleLogout}
                     className="hidden sm:flex items-center gap-2 bg-gray-600 dark:bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

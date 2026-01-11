@@ -22,8 +22,10 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
+
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 
 
@@ -75,6 +77,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'Authentication',
     'hospital',
     'doctor',
     'patient',
@@ -152,7 +155,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'telemedicine',    # database name
         'USER': 'root',          # mysql user
-        'PASSWORD': 'Aayrin30@#',  # mysql password
+        'PASSWORD': 'Mus@b1477',  # mysql password
         'HOST': 'localhost',
         'PORT': '3306',
         'OPTIONS': {

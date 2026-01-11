@@ -44,7 +44,33 @@ export function OfflineEMR({ patientId }) {
     } else {
       document.documentElement.classList.remove('dark')
     }
+    // Fetch doctor profile
+    fetchDoctorProfile()
   }, [])
+
+  const fetchDoctorProfile = async () => {
+    try {
+      const token = localStorage.getItem('accessToken')
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+      
+      const response = await fetch(`${apiUrl}auth/profile/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setProfileData(data)
+        console.log('✅ Profile loaded:', data)
+      }
+    } catch (err) {
+      console.error('❌ Profile fetch error:', err)
+    }
+  }
 
   const toggleDarkMode = () => {
     const newDarkMode = !isDark
@@ -262,7 +288,7 @@ export function OfflineEMR({ patientId }) {
               <h2 className="text-xl font-bold text-green-600 dark:text-green-400">SwasthLink</h2>
             </div>
             <button 
-              onClick={() => route('/doctor/profile')}
+              onClick={() => profileData?.id && route(`/doctor/profile/${profileData.id}`)}
               className="w-full bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-700 dark:to-gray-700 rounded-xl p-4 mb-6 hover:from-green-100 hover:to-emerald-100 dark:hover:from-gray-600 dark:hover:to-gray-600 transition-all"
             >
               <div className="flex items-center gap-3">

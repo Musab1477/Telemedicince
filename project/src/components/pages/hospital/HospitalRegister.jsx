@@ -6,6 +6,9 @@ export function HospitalRegister() {
   const [isDark, setIsDark] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [documents, setDocuments] = useState({
+    hospitalDigitalStamp: null
+  })
   const [formData, setFormData] = useState({
     hospitalName: '',
     registrationNumber: '',
@@ -51,25 +54,44 @@ export function HospitalRegister() {
         throw new Error('Please fill all required fields')
       }
 
-      // Prepare payload for API
-      const payload = {
+      // Validate hospital digital stamp
+      if (!documents.hospitalDigitalStamp) {
+        throw new Error('Please upload your hospital digital stamp')
+      }
+
+      // Prepare FormData to handle file upload
+      const payload = new FormData()
+      payload.append('hospital_name', formData.hospitalName)
+      payload.append('registration_number', formData.registrationNumber)
+      payload.append('hospital_type', formData.hospitalType)
+      payload.append('mobile_number', formData.phone)
+      payload.append('email', formData.email)
+      payload.append('hospital_address', formData.address)
+      payload.append('city', formData.city)
+      payload.append('state', formData.state)
+      payload.append('pincode', formData.pincode)
+      payload.append('admin_name', formData.adminName)
+      payload.append('admin_phone_number', formData.adminPhone)
+      
+      // Add hospital digital stamp file
+      if (documents.hospitalDigitalStamp && documents.hospitalDigitalStamp.file) {
+        payload.append('hospital_digital_stamp', documents.hospitalDigitalStamp.file, documents.hospitalDigitalStamp.name)
+      }
+
+      console.log('📤 Sending Hospital Registration with Digital Stamp')
+      console.log('Hospital Info:', {
         hospital_name: formData.hospitalName,
         registration_number: formData.registrationNumber,
         hospital_type: formData.hospitalType,
         mobile_number: formData.phone,
         email: formData.email,
-        hospital_address: formData.address,
         city: formData.city,
-        state: formData.state,
-        pincode: formData.pincode,
-        admin_name: formData.adminName,
-        admin_phone_number: formData.adminPhone
-      }
+        state: formData.state
+      })
+      console.log('Digital Stamp File:', documents.hospitalDigitalStamp?.name)
 
-      console.log('📤 Sending Hospital Registration Payload:', payload)
-
-      // Call API
-      const response = await api.createHospital(payload)
+      // Call API with file support
+      const response = await api.createHospitalWithFiles(payload)
 
       console.log('✅ Hospital Registration Success Response:', response)
       console.log('Response Type:', typeof response)
@@ -85,8 +107,8 @@ export function HospitalRegister() {
         generatedPassword: response.generated_password
       }))
 
-      // Show success alert with generated password
-      alert(`Hospital Registration Successful!\n\nYour temporary password has been sent to your email.\n\nPassword: ${response.generated_password}`)
+      // Show success alert with API message
+      alert(response.message || 'Hospital Registration Successful!')
       route('/hospital/login')
     } catch (err) {
       console.error('❌ Hospital Registration Error:', err)
@@ -104,6 +126,15 @@ export function HospitalRegister() {
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  function handleFileChange(field, files) {
+    const file = files && files.length > 0 ? files[0] : null
+    if (file) {
+      setDocuments(prev => ({ ...prev, [field]: { name: file.name, size: file.size, file: file, url: URL.createObjectURL(file) } }))
+    } else {
+      setDocuments(prev => ({ ...prev, [field]: null }))
+    }
   }
 
   return (
@@ -317,6 +348,32 @@ export function HospitalRegister() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    🏛️ Hospital Digital Stamp *
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => handleFileChange('hospitalDigitalStamp', e.target.files)}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-300 file:cursor-pointer hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30 transition-colors"
+                    required
+                  />
+                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    {documents.hospitalDigitalStamp ? (
+                      <span className="flex items-center">
+                        <span className="text-blue-600 dark:text-blue-400 mr-2">✓</span>
+                        {documents.hospitalDigitalStamp.name}
+                      </span>
+                    ) : (
+                      <span className="italic">No file selected</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Upload your hospital's official digital stamp/seal as an image or PDF
+                  </p>
                 </div>
               </div>
 

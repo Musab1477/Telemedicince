@@ -59,9 +59,6 @@ class CreateDoctorSerializer(serializers.ModelSerializer):
             "specialization",
             "years_of_experience",
             "highest_qualification",
-            "current_hospital",
-            "hospital_type",
-            "hospital_address",
             "consultation_fee",
             "degree_document",
             "other_certificate_document",
@@ -140,6 +137,8 @@ class CreateHospitalSerializer(serializers.ModelSerializer):
 
             "admin_name",
             "admin_phone_number",
+            
+            "hospital_digital_stamp",
         )
 
     def create(self, validated_data):
