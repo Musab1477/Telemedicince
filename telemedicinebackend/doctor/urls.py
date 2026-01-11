@@ -17,11 +17,15 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from .views  import *
-
+from patient.views import DoctorPatientListAPIView, DoctorPatientPrescriptionAPIView, update_prescription
 
 urlpatterns = [
     path('add-schedule/', create_individual_doctor_schedule, name="add_individual_doctor_schedule"),
     path('view-schedule/', get_individual_doctor_schedule, name="view_individual_doctor_schedule"),
     path('update-schedule/<int:schedule_id>/', update_individual_doctor_schedule, name="update_individual_doctor_schedule"),
     path('available-slots/<int:doctor_id>/', get_doctor_available_slots, name="get_doctor_available_slots"),
+    path("<int:doctor_id>/patients/", DoctorPatientListAPIView.as_view(), name="doctor-patients"),
+    path("<int:doctor_id>/patient/<int:patient_id>/prescriptions/", DoctorPatientPrescriptionAPIView.as_view(), name="doctor-patient-prescriptions"),
+    path("prescription/<int:prescription_id>/update/", update_prescription, name="update-prescription")
+    
 ]

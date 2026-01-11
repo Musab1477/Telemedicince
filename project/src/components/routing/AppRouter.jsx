@@ -25,6 +25,7 @@ import Payment from '../pages/patient/Payment'
 import { DoctorDashboard } from '../pages/doctor/DoctorDashboard'
 import { DoctorRegister } from '../pages/doctor/DoctorRegister'
 import ConsultationList from '../pages/doctor/ConsultationList'
+import VideoConsultation from '../pages/doctor/VideoConsultation'
 import { ConsultationRoom } from '../pages/doctor/ConsultationRoom'
 import ConsultationSummary from '../pages/doctor/ConsultationSummary'
 import { Schedule } from '../pages/doctor/Schedule'
@@ -165,6 +166,8 @@ export function AppRouter() {
           <ConsultationList />
         </ProtectedRoute>
       )} />
+
+      <Route path="/doctor/video-consultation/:appointmentId" component={VideoConsultation} />
 
       <Route path="/doctor/consultationRoom" component={() => (
         <ProtectedRoute requiredRole={USER_ROLES.DOCTOR} requireVerification={true}>

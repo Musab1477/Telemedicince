@@ -15,6 +15,7 @@ import { Community } from './components/pages/patient/Community'
 import GroupPage from './components/pages/patient/GroupPage'
 import { ConsultationLive } from './components/pages/patient/ConsultationLive'
 import Hospitals from './components/pages/patient/Hospitals'
+import NGOs from './components/pages/patient/NGOs'
 import MyAppointments from './components/pages/patient/MyAppointments'
 import Payment from './components/pages/patient/Payment'
 
@@ -31,6 +32,7 @@ import { IndependentPractice } from './components/pages/doctor/IndependentPracti
 import { ConsultationRoom } from './components/pages/doctor/ConsultationRoom'
 import ConsultationList from './components/pages/doctor/ConsultationList'
 import ConsultationSummary from './components/pages/doctor/ConsultationSummary'
+import VideoConsultation from './components/pages/doctor/VideoConsultation'
 
 // Hospital pages
 import { HospitalLogin } from './components/pages/hospital/HospitalLogin'
@@ -43,6 +45,10 @@ import { VerificationPendingPage } from './components/pages/VerificationPendingP
 import ManageDoctors from './components/pages/hospital/ManageDoctors'
 import PatientsRecord from './components/pages/hospital/PatientsRecord'
 
+// NGO pages
+import { NGOLogin } from './components/pages/ngo/NGOLogin'
+import { NGORegister } from './components/pages/ngo/NGORegister'
+import { NGODashboard } from './components/pages/ngo/NGODashboard'
 
 // Admin pages
 import { AdminLogin } from './components/pages/admin/AdminLogin'
@@ -54,8 +60,10 @@ import { NavBar } from './components/ui/NavBar'
 import PatientProfileClean from './components/pages/patient/PatientProfileClean'
 import DoctorProfileSelf from './components/pages/doctor/DoctorProfile'
 import HospitalDetails from './components/pages/patient/HospitalDetails'
+import NGODetails from './components/pages/patient/NGODetails'
 import { SideBar } from './components/ui/SideBar'
 import FormBuilder from './components/pages/hospital/FormBuilder'
+import HealthAgent from './components/pages/patient/HealthAgent'
 import N8nChatLoader from './components/pages/patient/N8nChatLoader'
 
 
@@ -78,13 +86,16 @@ export function App() {
         <Route path="/patient/appointments" component={MyAppointments} />
         <Route path="/patient/payment" component={Payment} />
         <Route path="/patient/hospitals" component={Hospitals} />
+        <Route path="/patient/ngos" component={NGOs} />
         <Route path="/patient/consultation/:id" component={ConsultationLive} />
         <Route path="/patient/doctor/:id" component={DoctorProfile} />
         <Route path="/patient/hospital/:id" component={HospitalDetails} />
+        <Route path="/patient/ngo/:id" component={NGODetails} />
         <Route path="/patient/booking/:doctorId" component={Booking} />
         <Route path="/patient/reports" component={Reports} />
         <Route path="/patient/community/:id" component={GroupPage} />
         <Route path="/patient/community" component={Community} />
+        <Route path="/patient/health-agent" component={HealthAgent} />
         
         {/* Doctor Routes */}
         <Route path="/doctor/login" component={DoctorLogin} />
@@ -94,6 +105,7 @@ export function App() {
         <Route path="/doctor/emr" component={OfflineEMR} />
         <Route path="/doctor/prescriptions" component={Prescriptions} />
         <Route path="/doctor/consultations" component={ConsultationList} />
+        <Route path="/doctor/video-consultation/:appointmentId" component={VideoConsultation} />
         <Route path="/doctor/consultationRoom" component={ConsultationRoom} />
         <Route path="/doctor/consultation-summary/:id" component={ConsultationSummary} />
         <Route path="/verification-pending" component={VerificationPendingPage} />
@@ -115,6 +127,11 @@ export function App() {
         <Route path="/hospital/form-builder" component={FormBuilder} />
 
         <Route path="/hospital/add-doctor" component={AddDoctorManually} />
+        
+        {/* NGO Routes */}
+        <Route path="/ngo/login" component={NGOLogin} />
+        <Route path="/ngo/register" component={NGORegister} />
+        <Route path="/ngo/dashboard" component={NGODashboard} />
         
         {/* Admin Routes */}
         <Route path="/admin/login" component={AdminLogin} />

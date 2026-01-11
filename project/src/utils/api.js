@@ -181,6 +181,16 @@ export async function getPatientProfile() {
   })
 }
 
+export async function updatePatientProfile(profileData) {
+  const accessToken = localStorage.getItem('accessToken')
+  console.log('📤 Update Patient Profile Request:', profileData)
+  return await request('/auth/profile/', {
+    method: 'PATCH',
+    body: JSON.stringify(profileData),
+    headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}
+  })
+}
+
 // Doctor Login APIs
 export async function loginDoctor(mobileNumber, password) {
   console.log('📤 Doctor Login Request:', { mobile_number: mobileNumber, password })
@@ -253,4 +263,48 @@ export async function getHospitalProfile() {
   })
 }
 
-export default { postDoctorRegistration, getRegistrationStatus, resendRegistration, cancelRegistration, createPatient, createDoctor, createDoctorWithFiles, createHospital, createHospitalWithFiles, loginPatient, verifyOTP, logoutPatient, getPatientProfile, loginDoctor, verifyDoctorOTP, logoutDoctor, getDoctorProfile, loginHospital, verifyHospitalOTP, logoutHospital, getHospitalProfile }
+// NGO APIs
+export async function createNGO(payload) {
+  console.log('📤 NGO Registration Request:', payload)
+  return await request('/auth/ngo/register/', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+}
+
+export async function loginNGO(mobileNumber, password) {
+  console.log('📤 NGO Login Request:', { mobile_number: mobileNumber, password })
+  return await request('/auth/ngo/login/', {
+    method: 'POST',
+    body: JSON.stringify({ mobile_number: mobileNumber, password })
+  })
+}
+
+export async function verifyNGOOTP(userId, otp) {
+  console.log('📤 NGO OTP Verification Request:', { user_id: userId, otp })
+  return await request('/auth/ngo/verify-otp/', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, otp })
+  })
+}
+
+export async function logoutNGO() {
+  const accessToken = localStorage.getItem('accessToken')
+  console.log('📤 NGO Logout Request')
+  return await request('/auth/ngo/logout/', {
+    method: 'POST',
+    body: JSON.stringify({}),
+    headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}
+  })
+}
+
+export async function getNGOProfile() {
+  const accessToken = localStorage.getItem('accessToken')
+  console.log('📤 Get NGO Profile Request')
+  return await request('/auth/ngo/profile/', {
+    method: 'GET',
+    headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}
+  })
+}
+
+export default { postDoctorRegistration, getRegistrationStatus, resendRegistration, cancelRegistration, createPatient, createDoctor, createDoctorWithFiles, createHospital, loginPatient, verifyOTP, logoutPatient, getPatientProfile, updatePatientProfile, loginDoctor, verifyDoctorOTP, logoutDoctor, getDoctorProfile, loginHospital, verifyHospitalOTP, logoutHospital, getHospitalProfile, createNGO, loginNGO, verifyNGOOTP, logoutNGO, getNGOProfile }

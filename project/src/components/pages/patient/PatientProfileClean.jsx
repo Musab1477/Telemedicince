@@ -1,11 +1,13 @@
-import { useState } from 'preact/hooks'
+import { useState, useEffect } from 'preact/hooks'
 import { useAuth } from '../../../contexts/AuthContext'
 import { route } from 'preact-router'
 import { PatientLayout } from '../../ui/PatientLayout'
+import * as api from '../../../utils/api'
 
 export default function PatientProfileClean() {
   const { user, login } = useAuth()
   const [editing, setEditing] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   
   // Use user data or fallback to empty strings
   const displayUser = user || { first_name: '', last_name: '', mobile_number: '', email: '', age: '', gender: '', address: '', emergencyContact: '' }
@@ -21,16 +23,65 @@ export default function PatientProfileClean() {
     emergencyContact: displayUser?.emergencyContact || ''
   }))
 
+  // Update form when user data changes
+  useEffect(() => {
+    if (user) {
+      setForm({
+        name: user.name || user.first_name || '',
+        phone: user.phone || user.mobile_number || '',
+        email: user.email || '',
+        dob: user.dob || '',
+        gender: user.gender || '',
+        address: user.address || '',
+        emergencyContact: user.emergencyContact || user.emergency_contact || ''
+      })
+    }
+  }, [user])
+
   const handleChange = (e) => {
     const { name, value } = e.target
     setForm(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault()
-    const updated = { ...displayUser, ...form }
-    login(updated)
-    setEditing(false)
+    setIsLoading(true)
+    
+    try {
+      // Create updated user object
+      const updated = { 
+        ...displayUser, 
+        ...form,
+        // Ensure both field names are present for compatibility
+        mobile_number: form.phone,
+        first_name: form.name?.split(' ')[0] || form.name,
+        last_name: form.name?.split(' ').slice(1).join(' ') || '',
+        emergency_contact: form.emergencyContact
+      }
+      
+      // Save to AuthContext and localStorage
+      login(updated)
+      console.log('✅ Profile updated in localStorage:', updated)
+      
+      // Try to update on backend as well (optional - won't fail if API is down)
+      try {
+        const accessToken = localStorage.getItem('accessToken')
+        if (accessToken) {
+          await api.updatePatientProfile(updated)
+          console.log('✅ Profile updated on backend')
+        }
+      } catch (apiErr) {
+        console.warn('⚠️ Backend update failed, but local update succeeded:', apiErr)
+      }
+      
+      alert('✅ Profile updated successfully!')
+      setEditing(false)
+    } catch (err) {
+      console.error('❌ Profile update error:', err)
+      alert('Error updating profile. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleLogout = async () => {

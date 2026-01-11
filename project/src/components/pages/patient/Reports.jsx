@@ -1,51 +1,105 @@
-import { useState } from 'preact/hooks'
+import { useState, useEffect } from 'preact/hooks'
 import { route } from 'preact-router'
 import { PatientLayout } from '../../ui/PatientLayout'
+import { jsPDF } from 'jspdf'
 
 export function Reports() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [reports, setReports] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const mockReports = [
-    {
-      id: 1,
-      date: '2024-01-15',
-      doctor: 'Dr. Rajesh Kumar',
-      doctorId: 'MCI-12345',
-      type: 'General Checkup',
-      status: 'completed',
-      symptoms: 'Fever, headache',
-      diagnosis: 'Viral fever',
-      prescription: 'Paracetamol 500mg, Rest',
-      signature: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="80"%3E%3Ctext x="10" y="40" font-family="cursive" font-size="24" fill="%23059669"%3EDr. R. Kumar%3C/text%3E%3Ctext x="10" y="60" font-family="monospace" font-size="10" fill="%23666"%3EMCI-12345%3C/text%3E%3C/svg%3E'
-    },
-    {
-      id: 2,
-      date: '2024-01-10',
-      doctor: 'Dr. Priya Sharma',
-      doctorId: 'MCI-67890',
-      type: 'Follow-up',
-      status: 'completed',
-      symptoms: 'Cough, cold',
-      diagnosis: 'Upper respiratory infection',
-      prescription: 'Cough syrup, Steam inhalation',
-      signature: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="80"%3E%3Ctext x="10" y="40" font-family="cursive" font-size="24" fill="%23059669"%3EDr. P. Sharma%3C/text%3E%3Ctext x="10" y="60" font-family="monospace" font-size="10" fill="%23666"%3EMCI-67890%3C/text%3E%3C/svg%3E'
-    },
-    {
-      id: 3,
-      date: '2024-01-20',
-      doctor: 'Dr. Amit Patel',
-      doctorId: 'MCI-11223',
-      type: 'Cardiology Consultation',
-      status: 'upcoming',
-      symptoms: 'Chest pain',
-      diagnosis: 'Pending',
-      prescription: 'Pending',
-      signature: null
+  // Fetch reports from API
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const token = localStorage.getItem('accessToken')
+        if (!token) {
+          setError('Please login to view reports')
+          setLoading(false)
+          return
+        }
+
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+        const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+
+        console.log('📡 Fetching reports from:', `${apiUrl}patient/appointments-with-prescriptions/`)
+
+        const response = await fetch(`${apiUrl}patient/appointments-with-prescriptions/`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        console.log('📥 Response Status:', response.status)
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('❌ Failed to fetch reports:', errorData)
+          throw new Error(errorData.detail || 'Failed to fetch reports')
+        }
+
+        const data = await response.json()
+        console.log('✅ Reports received:', data)
+
+        // Map API response to component format
+        const reportsArray = Array.isArray(data) ? data : []
+        const mappedReports = reportsArray.map(item => {
+          const { appointment, prescription } = item
+          
+          // Format medicines as prescription text
+          const prescriptionText = prescription?.medicines?.length > 0
+            ? prescription.medicines.map(med => 
+                `${med.medicine_name} ${med.dose} - ${med.frequency} (${med.timing}) for ${med.duration}`
+              ).join(', ')
+            : 'No prescription'
+
+          // Build signature URL
+          const baseUrlClean = apiUrl.replace(/\/$/, '')
+          const signatureUrl = prescription?.digital_signature 
+            ? `${baseUrlClean}${prescription.digital_signature}`
+            : null
+
+          return {
+            id: appointment.id,
+            date: appointment.appointment_date,
+            doctor: appointment.doctor_name,
+            doctorId: `DOC-${appointment.doctor}`,
+            type: 'Consultation',
+            status: appointment.status === 'completed' ? 'completed' : 'upcoming',
+            symptoms: prescription?.additional_notes || 'Not recorded',
+            diagnosis: prescription?.diagnosis || 'Pending',
+            prescription: prescriptionText,
+            signature: signatureUrl,
+            // Additional fields from API
+            startTime: appointment.start_time,
+            endTime: appointment.end_time,
+            paymentStatus: appointment.payment_status,
+            amount: appointment.amount,
+            transcriptionFile: appointment.transcription_file,
+            medicines: prescription?.medicines || []
+          }
+        })
+
+        setReports(mappedReports)
+      } catch (err) {
+        console.error('Error fetching reports:', err)
+        setError(err.message || 'Failed to load reports')
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
 
-  const filteredReports = mockReports.filter(report => {
+    fetchReports()
+  }, [])
+
+  const filteredReports = reports.filter(report => {
     const matchesSearch = report.doctor.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          report.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          report.symptoms.toLowerCase().includes(searchTerm.toLowerCase())
@@ -53,31 +107,306 @@ export function Reports() {
     return matchesSearch && matchesStatus
   })
 
-  const handleDownload = (reportId) => {
+  // Helper function to load image from URL and convert to base64
+  const loadImageAsBase64 = (url) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'Anonymous' // Enable CORS
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.width
+          canvas.height = img.height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0)
+          const dataURL = canvas.toDataURL('image/png')
+          resolve(dataURL)
+        } catch (err) {
+          reject(err)
+        }
+      }
+      img.onerror = (err) => reject(err)
+      img.src = url
+    })
+  }
+
+  const handleDownload = async (reportId) => {
     try {
-      const report = mockReports.find(r => r.id === reportId)
+      const report = reports.find(r => r.id === reportId)
       if (!report) throw new Error('Report not found')
 
-      const html = generateReportHTML(report)
-      const blob = new Blob([html], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `report-${reportId}.html`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      // Load signature image if available
+      let signatureBase64 = null
+      if (report.signature) {
+        try {
+          console.log('Loading signature from:', report.signature)
+          signatureBase64 = await loadImageAsBase64(report.signature)
+          console.log('Signature loaded successfully')
+        } catch (err) {
+          console.warn('Could not load signature image:', err)
+          // Continue without signature image
+        }
+      }
+
+      // Generate PDF prescription
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const margin = 20
+      let yPos = margin
+
+      // Helper function to add text with word wrap
+      const addWrappedText = (text, x, y, maxWidth, lineHeight = 6) => {
+        const lines = doc.splitTextToSize(text, maxWidth)
+        doc.text(lines, x, y)
+        return y + (lines.length * lineHeight)
+      }
+
+      // ===== HEADER SECTION =====
+      // Green header bar
+      doc.setFillColor(5, 150, 105) // Green color
+      doc.rect(0, 0, pageWidth, 45, 'F')
+
+      // Clinic/Hospital Name
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(22)
+      doc.setFont('helvetica', 'bold')
+      doc.text('SwasthLink Healthcare', margin, 18)
+
+      // Tagline
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Your Health, Our Priority', margin, 26)
+
+      // Contact Info on right
+      doc.setFontSize(9)
+      doc.text('📞 1800-XXX-XXXX', pageWidth - margin - 40, 18)
+      doc.text('🌐 www.swasthlink.in', pageWidth - margin - 40, 26)
+      doc.text('✉ care@swasthlink.in', pageWidth - margin - 40, 34)
+
+      // ===== PRESCRIPTION TITLE =====
+      yPos = 55
+      doc.setTextColor(5, 150, 105)
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text('MEDICAL PRESCRIPTION', pageWidth / 2, yPos, { align: 'center' })
+
+      // Divider line
+      yPos += 8
+      doc.setDrawColor(5, 150, 105)
+      doc.setLineWidth(0.5)
+      doc.line(margin, yPos, pageWidth - margin, yPos)
+
+      // ===== DOCTOR INFO SECTION =====
+      yPos += 12
+      doc.setFillColor(240, 253, 244) // Light green background
+      doc.rect(margin, yPos - 5, pageWidth - (2 * margin), 28, 'F')
+
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text(report.doctor, margin + 5, yPos + 3)
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100, 100, 100)
+      doc.text(`Reg. No: ${report.doctorId}`, margin + 5, yPos + 11)
+      doc.text(`Consultation Type: ${report.type}`, margin + 5, yPos + 18)
+
+      // Date on right side
+      doc.setFontSize(10)
+      doc.setTextColor(0, 0, 0)
+      doc.text(`Date: ${new Date(report.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageWidth - margin - 50, yPos + 3)
+      if (report.startTime) {
+        doc.text(`Time: ${report.startTime}`, pageWidth - margin - 50, yPos + 11)
+      }
+
+      // ===== PATIENT INFO =====
+      yPos += 35
+      doc.setDrawColor(200, 200, 200)
+      doc.setLineWidth(0.3)
+      doc.line(margin, yPos, pageWidth - margin, yPos)
+      
+      yPos += 8
+      doc.setTextColor(100, 100, 100)
+      doc.setFontSize(9)
+      doc.text('PATIENT DETAILS', margin, yPos)
+      
+      yPos += 6
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Patient ID: ', margin, yPos)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`#${report.id}`, margin + 25, yPos)
+
+      // ===== SYMPTOMS / CHIEF COMPLAINTS =====
+      yPos += 15
+      doc.setFillColor(254, 243, 199) // Light yellow
+      doc.rect(margin, yPos - 4, pageWidth - (2 * margin), 8, 'F')
+      doc.setTextColor(146, 64, 14)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('CHIEF COMPLAINTS / SYMPTOMS', margin + 3, yPos + 1)
+
+      yPos += 10
+      doc.setTextColor(0, 0, 0)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11)
+      yPos = addWrappedText(report.symptoms || 'Not recorded', margin, yPos, pageWidth - (2 * margin))
+
+      // ===== DIAGNOSIS =====
+      yPos += 8
+      doc.setFillColor(219, 234, 254) // Light blue
+      doc.rect(margin, yPos - 4, pageWidth - (2 * margin), 8, 'F')
+      doc.setTextColor(30, 64, 175)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('DIAGNOSIS', margin + 3, yPos + 1)
+
+      yPos += 10
+      doc.setTextColor(0, 0, 0)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11)
+      yPos = addWrappedText(report.diagnosis || 'Pending', margin, yPos, pageWidth - (2 * margin))
+
+      // ===== PRESCRIPTION / MEDICINES =====
+      yPos += 8
+      doc.setFillColor(220, 252, 231) // Light green
+      doc.rect(margin, yPos - 4, pageWidth - (2 * margin), 8, 'F')
+      doc.setTextColor(22, 101, 52)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.text('℞ PRESCRIPTION', margin + 3, yPos + 1)
+
+      yPos += 12
+
+      // Check if we have detailed medicines array
+      if (report.medicines && report.medicines.length > 0) {
+        // Table header
+        doc.setFillColor(243, 244, 246)
+        doc.rect(margin, yPos - 4, pageWidth - (2 * margin), 8, 'F')
+        doc.setTextColor(75, 85, 99)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'bold')
+        
+        const col1 = margin + 3
+        const col2 = margin + 60
+        const col3 = margin + 90
+        const col4 = margin + 120
+        const col5 = margin + 150
+        
+        doc.text('Medicine', col1, yPos)
+        doc.text('Dose', col2, yPos)
+        doc.text('Frequency', col3, yPos)
+        doc.text('Timing', col4, yPos)
+        doc.text('Duration', col5, yPos)
+
+        yPos += 8
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(0, 0, 0)
+        doc.setFontSize(10)
+
+        report.medicines.forEach((med, index) => {
+          // Alternate row background
+          if (index % 2 === 0) {
+            doc.setFillColor(249, 250, 251)
+            doc.rect(margin, yPos - 4, pageWidth - (2 * margin), 8, 'F')
+          }
+
+          doc.text(`${index + 1}. ${med.medicine_name}`, col1, yPos)
+          doc.text(med.dose || '-', col2, yPos)
+          doc.text(med.frequency || '-', col3, yPos)
+          doc.text((med.timing || '-').replace('_', ' '), col4, yPos)
+          doc.text(med.duration || '-', col5, yPos)
+          yPos += 8
+        })
+      } else {
+        // Simple prescription text
+        doc.setTextColor(0, 0, 0)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(11)
+        yPos = addWrappedText(report.prescription || 'No prescription', margin, yPos, pageWidth - (2 * margin))
+      }
+
+      // ===== ADDITIONAL NOTES =====
+      if (report.symptoms && report.symptoms !== 'Not recorded') {
+        yPos += 10
+        doc.setTextColor(100, 100, 100)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'italic')
+        doc.text('Additional Notes: Drink plenty of fluids, take adequate rest.', margin, yPos)
+      }
+
+      // ===== SIGNATURE SECTION =====
+      yPos = pageHeight - 55
+      doc.setDrawColor(200, 200, 200)
+      doc.setLineWidth(0.3)
+      doc.line(margin, yPos, pageWidth - margin, yPos)
+
+      yPos += 10
+      // Signature on right
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      
+      if (signatureBase64) {
+        // Add actual signature image
+        try {
+          doc.addImage(signatureBase64, 'PNG', pageWidth - margin - 65, yPos - 2, 60, 25)
+          doc.setFontSize(8)
+          doc.setTextColor(22, 101, 52)
+          doc.text('✓ Digitally Signed', pageWidth - margin - 55, yPos + 26)
+        } catch (imgErr) {
+          console.warn('Failed to add signature to PDF:', imgErr)
+          // Fallback: Draw placeholder box
+          doc.setDrawColor(5, 150, 105)
+          doc.setLineWidth(0.5)
+          doc.rect(pageWidth - margin - 60, yPos, 60, 20)
+          doc.setFontSize(8)
+          doc.setTextColor(100, 100, 100)
+          doc.text('Digital Signature', pageWidth - margin - 55, yPos + 12)
+        }
+      } else if (report.signature) {
+        // Signature URL exists but couldn't load - show placeholder
+        doc.setDrawColor(5, 150, 105)
+        doc.setLineWidth(0.5)
+        doc.rect(pageWidth - margin - 60, yPos, 60, 20)
+        doc.setFontSize(8)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Digital Signature', pageWidth - margin - 55, yPos + 12)
+      }
+
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(10)
+      doc.text(report.doctor, pageWidth - margin - 60, yPos + 32)
+      doc.setFontSize(8)
+      doc.setTextColor(100, 100, 100)
+      doc.text(`Reg: ${report.doctorId}`, pageWidth - margin - 60, yPos + 38)
+
+      // ===== FOOTER =====
+      yPos = pageHeight - 15
+      doc.setFillColor(243, 244, 246)
+      doc.rect(0, yPos - 5, pageWidth, 20, 'F')
+      
+      doc.setTextColor(107, 114, 128)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.text('This is a computer-generated prescription and is valid without physical signature.', pageWidth / 2, yPos, { align: 'center' })
+      doc.text(`Generated on: ${new Date().toLocaleString('en-IN')} | Prescription ID: RX-${report.id}`, pageWidth / 2, yPos + 5, { align: 'center' })
+
+      // Save PDF
+      doc.save(`prescription-${report.id}.pdf`)
     } catch (err) {
       console.error('Download failed', err)
-      alert('Failed to download report')
+      alert('Failed to download prescription')
     }
   }
 
   const handleShare = (reportId) => {
     ;(async () => {
       try {
-        const report = mockReports.find(r => r.id === reportId)
+        const report = reports.find(r => r.id === reportId)
         if (!report) throw new Error('Report not found')
 
         const html = generateReportHTML(report)
@@ -166,8 +495,38 @@ export function Reports() {
   }
 
   return (
-    <PatientLayout title="Health Records" subtitle={`${filteredReports.length} records found`}>
+    <PatientLayout title="Health Records" subtitle={loading ? 'Loading...' : `${filteredReports.length} records found`}>
       <div className="max-w-6xl mx-auto">
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-gray-200 dark:border-gray-700">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading your health records...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 mb-6 border border-red-200 dark:border-red-800">
+            <div className="flex items-center gap-3">
+              <div className="text-red-600 dark:text-red-400 text-2xl">⚠️</div>
+              <div>
+                <h3 className="text-red-800 dark:text-red-300 font-semibold">Error loading records</h3>
+                <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Main Content - Only show when not loading */}
+        {!loading && !error && (
+          <>
         {/* Search and Filters */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mb-6 border border-gray-200 dark:border-gray-700">
           <div className="space-y-4">
@@ -332,6 +691,8 @@ export function Reports() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     </PatientLayout>
   )

@@ -13,6 +13,10 @@ export function HomePage() {
     route('/hospital/login')
   }
 
+  const handleNGOClick = () => {
+    route('/ngo/login')
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -41,7 +45,7 @@ export function HomePage() {
           </div>
 
           {/* Role Selection Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
             {/* Patient Card */}
             <div
               onClick={handlePatientClick}
@@ -84,6 +88,21 @@ export function HomePage() {
               </p>
               <button className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors">
                 Login as Hospital
+              </button>
+            </div>
+
+            {/* NGO Card */}
+            <div
+              onClick={handleNGOClick}
+              className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 cursor-pointer p-8 text-center border border-gray-200"
+            >
+              <div className="text-6xl mb-5">🤝</div>
+              <h3 className="text-2xl font-semibold text-gray-900 mb-3">NGO</h3>
+              <p className="text-gray-600 mb-6 text-sm">
+                Manage programs, volunteers, donations & community impact
+              </p>
+              <button className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors">
+                Login as NGO
               </button>
             </div>
           </div>

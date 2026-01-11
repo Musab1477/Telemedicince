@@ -59,8 +59,11 @@ def login_user(request):
     otp_code = generate_otp()
     print(otp_code)
     store_otp_in_redis(user.id, otp_code)
+    mobile_number = "+91" + mobile_number  # Assuming country code +91
+    print(f"Generated OTP for user {user.id}: {otp_code}")  # Debugging line
 
     # 📲 SEND OTP VIA TWILIO (DEV MODE)
+    print(otp_code)  # For testing purposes
     send_otp_twilio(otp_code, mobile_number)
 
     return Response(
@@ -114,6 +117,8 @@ def verify_otp_and_login(request):
             "user": {
                 "id": user.id,
                 "role": user.role,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
                 "mobile_number": user.mobile_number,
             },
             "tokens": tokens,
@@ -156,8 +161,10 @@ def create_patient_user(request):
     """
     try:
         serializer = CreatePatientSerializer(data=request.data)
+        print(request.data)
 
         if not serializer.is_valid():
+            print("Serializer errors:", serializer.errors)  # Debugging line
             return Response(
                 {
                     "message": "Validation error",
@@ -401,4 +408,5 @@ def create_hospital_user(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
