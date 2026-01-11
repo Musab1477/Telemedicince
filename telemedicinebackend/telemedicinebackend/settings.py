@@ -67,13 +67,13 @@ CSRF_COOKIE_SECURE = False
 # Application definition
 
 INSTALLED_APPS = [
+    'Authentication.apps.AuthenticationConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'Authentication',
     'hospital',
     'doctor',
     'patient',
@@ -143,12 +143,15 @@ WSGI_APPLICATION = 'telemedicinebackend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+AUTH_USER_MODEL = 'Authentication.User'
+
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'telemedicine',    # database name
         'USER': 'root',          # mysql user
-        'PASSWORD': 'ayan@123',  # mysql password
+        'PASSWORD': 'Aayrin30@#',  # mysql password
         'HOST': 'localhost',
         'PORT': '3306',
         'OPTIONS': {
