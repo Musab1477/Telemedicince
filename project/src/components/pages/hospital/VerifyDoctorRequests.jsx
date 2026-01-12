@@ -28,7 +28,7 @@ export function VerifyDoctorRequests() {
     { icon: '🏠', label: 'Dashboard', active: false, onClick: () => route('/hospital/dashboard') },
     { icon: '📋', label: 'Patients', active: false, onClick: () => route('/hospital/patients-record') },
     { icon: '👨‍⚕️', label: 'Manage Doctors', active: false, onClick: () => route('/hospital/manage-doctors') },
-    { icon: '✅', label: 'Doctor Requests', active: true, onClick: () => {} },
+    // { icon: '✅', label: 'Doctor Requests', active: true, onClick: () => {} },
     { icon: '➕', label: 'Add Doctor', active: false, onClick: () => route('/hospital/add-doctor') },
     { icon: '📝', label: 'Form Builder', active: false, onClick: () => route('/hospital/form-builder') },
   ]
