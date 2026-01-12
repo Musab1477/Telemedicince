@@ -86,15 +86,22 @@ export default defineConfig({
               },
               networkTimeoutSeconds: 5
             }
+          },
+          // API POST/PUT requests with Background Sync
+          {
+            urlPattern: /\/api\/.*/,
+            method: 'POST',
+            handler: 'NetworkOnly',
+            options: {
+              backgroundSync: {
+                name: 'swasthlink-background-sync',
+                options: {
+                  maxRetentionTime: 24 * 60 // 24 hours in minutes
+                }
+              }
+            }
           }
-        ],
-        // Background Sync for offline actions
-        backgroundSync: {
-          name: 'swasthlink-background-sync',
-          options: {
-            maxRetentionTime: 24 * 60 // 24 hours in minutes
-          }
-        }
+        ]
       },
       manifest: {
         name: 'SwasthLink - Telemedicine Platform',

@@ -15,6 +15,7 @@ from pathlib import Path
 
 import os
 from dotenv import load_dotenv
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -51,9 +52,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React + Vite  dev
     "https://b93e810dbec1.ngrok-free.app",
-    # "http://192.168.1.5:3000",
-    # "http://172.20.10.2:3000",
-    # "https://33af6d8ffd5e.ngrok-free.app"
+    "https://telemedicine-theta.vercel.app",
 ]
 
 from corsheaders.defaults import default_headers, default_methods
@@ -148,20 +147,25 @@ WSGI_APPLICATION = 'telemedicinebackend.wsgi.application'
 
 AUTH_USER_MODEL = 'Authentication.User'
 
-
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'telemedicine',    # database name
-        'USER': 'root',          # mysql user
-        'PASSWORD': 'Mus@b1477',  # mysql password
-        'HOST': 'localhost',
-        'PORT': '3306',
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
-        }
-    }
+    'default': dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+    )
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'telemedicine',    # database name
+#         'USER': 'root',          # mysql user
+#         'PASSWORD': 'ayan@123',  # mysql password
+#         'HOST': 'localhost',
+#         'PORT': '3306',
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
+#         }
+#     }
+# }
 
 
 # Password validation
@@ -197,7 +201,7 @@ USE_TZ = True
 
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # for production (collectstatic)
+STATIC_ROOT = BASE_DIR / "staticfiles"  # for production (collectstatic)
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
@@ -212,10 +216,15 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Redis Configuration
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-REDIS_DB = int(os.getenv("REDIS_DB", 0))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.environ.get("REDIS_URL"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
 
 # OTP Settings
 OTP_EXPIRY_SECONDS = 300  # 5 minutes
