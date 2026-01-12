@@ -15,6 +15,7 @@ from pathlib import Path
 
 import os
 from dotenv import load_dotenv
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -148,10 +149,9 @@ WSGI_APPLICATION = 'telemedicinebackend.wsgi.application'
 AUTH_USER_MODEL = 'Authentication.User'
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+    )
 }
 
 # DATABASES = {
