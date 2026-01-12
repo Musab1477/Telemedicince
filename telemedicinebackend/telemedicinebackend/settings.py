@@ -51,9 +51,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React + Vite  dev
     "https://b93e810dbec1.ngrok-free.app",
-    # "http://192.168.1.5:3000",
-    # "http://172.20.10.2:3000",
-    # "https://33af6d8ffd5e.ngrok-free.app"
+    "https://telemedicine-theta.vercel.app",
 ]
 
 from corsheaders.defaults import default_headers, default_methods
@@ -204,7 +202,7 @@ USE_TZ = True
 
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # for production (collectstatic)
+STATIC_ROOT = BASE_DIR / "staticfiles"  # for production (collectstatic)
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
@@ -219,10 +217,15 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Redis Configuration
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-REDIS_DB = int(os.getenv("REDIS_DB", 0))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.environ.get("REDIS_URL"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
 
 # OTP Settings
 OTP_EXPIRY_SECONDS = 300  # 5 minutes
