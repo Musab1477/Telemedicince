@@ -644,7 +644,7 @@ export function Schedule() {
   const menuItems = [
     { icon: '🏠', label: 'Dashboard', onClick: () => route('/doctor/dashboard') },
     { icon: '📅', label: 'Schedule', active: true, onClick: () => {} },
-    // { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
+    { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
     { icon: '💊', label: 'Prescriptions', onClick: () => route('/doctor/prescriptions') },
     { icon: '🎥', label: 'Consultations', onClick: () => route('/doctor/consultations') },
   ]

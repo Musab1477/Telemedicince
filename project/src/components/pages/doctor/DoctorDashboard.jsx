@@ -200,7 +200,7 @@ export function DoctorDashboard() {
   const menuItems = [
     { icon: '🏠', label: 'Dashboard', active: true, onClick: () => {} },
     { icon: '📅', label: 'Schedule', onClick: handleSchedule },
-    // { icon: '📋', label: 'EMR', onClick: handleEMR },
+    { icon: '📋', label: 'EMR', onClick: handleEMR },
     { icon: '💊', label: 'Prescriptions', onClick: handlePrescriptions },
     { icon: '🎥', label: 'Consultations', onClick: consultation },
   ]
