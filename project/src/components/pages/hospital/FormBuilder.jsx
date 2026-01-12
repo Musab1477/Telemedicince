@@ -62,7 +62,7 @@ export function FormBuilder() {
     { icon: '🏠', label: 'Dashboard', active: false, onClick: () => route('/hospital/dashboard') },
     { icon: '📋', label: 'Patients', active: false, onClick: () => route('/hospital/patients-record') },
     { icon: '👨‍⚕️', label: 'Manage Doctors', active: false, onClick: () => route('/hospital/doctors') },
-    { icon: '✅', label: 'Doctor Requests', active: false, onClick: () => route('/hospital/doctor-requests') },
+    // { icon: '✅', label: 'Doctor Requests', active: false, onClick: () => route('/hospital/doctor-requests') },
     { icon: '➕', label: 'Add Doctor', active: false, onClick: () => route('/hospital/add-doctor') },
     { icon: '📝', label: 'Form Builder', active: true, onClick: () => {} },
   ]

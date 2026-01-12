@@ -110,7 +110,7 @@ export function HospitalDashboard() {
     { icon: '🏠', label: 'Dashboard', active: true, onClick: () => {} },
     { icon: '📋', label: 'Patients', active: false, onClick: () => route('/hospital/patients-record') },
     { icon: '👨‍⚕️', label: 'Manage Doctors', active: false, onClick: () => route('/hospital/manage-doctors') },
-    { icon: '✅', label: 'Doctor Requests', active: false, onClick: () => route('/hospital/doctor-requests') },
+    // { icon: '✅', label: 'Doctor Requests', active: false, onClick: () => route('/hospital/doctor-requests') },
     { icon: '➕', label: 'Add Doctor', active: false, onClick: () => route('/hospital/add-doctor') },
     { icon: '📝', label: 'Form Builder', active: false, onClick: () => route('/hospital/form-builder') },
   ]
@@ -164,12 +164,12 @@ export function HospitalDashboard() {
             </nav>
 
             {/* Emergency Button */}
-            <div className="mt-auto pt-6">
+            {/* <div className="mt-auto pt-6">
               <button className="w-full bg-red-500 hover:bg-red-600 text-white rounded-lg px-4 py-3 flex items-center justify-center gap-2 font-medium transition-colors">
                 <span className="text-xl">🚨</span>
                 <span className="text-sm">Emergency: 108</span>
               </button>
-            </div>
+            </div> */}
           </div>
         </aside>
 

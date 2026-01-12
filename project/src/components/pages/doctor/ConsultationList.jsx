@@ -197,8 +197,8 @@ export default function ConsultationList() {
   const menuItems = [
     { icon: '🏠', label: 'Dashboard', onClick: () => route('/doctor/dashboard') },
     { icon: '📅', label: 'Schedule', onClick: () => route('/doctor/schedule') },
-    // { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
-    { icon: '💊', label: 'Prescriptions', onClick: () => route('/doctor/prescriptions') },
+    { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
+    // { icon: '💊', label: 'Prescriptions', onClick: () => route('/doctor/prescriptions') },
     { icon: '🎥', label: 'Consultations', active: true, onClick: () => {} },
   ]
 

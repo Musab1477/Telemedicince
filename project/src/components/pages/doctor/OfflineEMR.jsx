@@ -266,7 +266,7 @@ export function OfflineEMR({ patientId }) {
     { icon: '🏠', label: 'Dashboard', onClick: () => route('/doctor/dashboard') },
     { icon: '📅', label: 'Schedule', onClick: () => route('/doctor/schedule') },
     { icon: '📋', label: 'EMR', active: true, onClick: () => {} },
-    { icon: '💊', label: 'Prescriptions', onClick: () => route('/doctor/prescriptions') },
+    // { icon: '💊', label: 'Prescriptions', onClick: () => route('/doctor/prescriptions') },
     { icon: '🎥', label: 'Consultations', onClick: () => route('/doctor/consultations') },
   ]
 
