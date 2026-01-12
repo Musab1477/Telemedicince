@@ -3,10 +3,11 @@ import { useState, useEffect } from 'preact/hooks'
 import { useAuth } from '../../contexts/AuthContext'
 
 export function PatientLayout({ children, title, subtitle, showSidebar = true }) {
-  const { user } = useAuth()
+  const { user, login } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDark, setIsDark] = useState(false)
   const [currentPath, setCurrentPath] = useState('')
+  const [profileData, setProfileData] = useState(null)
 
   useEffect(() => {
     const darkMode = localStorage.getItem('darkMode') === 'true'
@@ -15,7 +16,64 @@ export function PatientLayout({ children, title, subtitle, showSidebar = true })
       document.documentElement.classList.add('dark')
     }
     setCurrentPath(window.location.pathname)
+
+    // Fetch user profile on component mount
+    fetchUserProfile()
   }, [])
+
+  const fetchUserProfile = async () => {
+    try {
+      const accessToken = localStorage.getItem('accessToken')
+      
+      if (!accessToken) {
+        console.log('⚠️ No access token found')
+        return
+      }
+
+      console.log('📤 Fetching User Profile from PatientLayout...')
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+
+      const response = await fetch(`${apiUrl}auth/profile/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      })
+
+      if (!response.ok) {
+        console.error('❌ Failed to fetch profile:', response.status)
+        return
+      }
+
+      const data = await response.json()
+      console.log('✅ Profile Fetch Success:', data)
+      console.log('User ID:', data.id)
+      console.log('First Name:', data.first_name)
+      console.log('Last Name:', data.last_name)
+      console.log('Role:', data.role)
+      console.log('Mobile Number:', data.mobile_number)
+
+      setProfileData(data)
+      
+      // Update AuthContext with fetched profile data
+      const userData = {
+        id: data.id,
+        name: `${data.first_name} ${data.last_name}`.trim(),
+        first_name: data.first_name,
+        last_name: data.last_name,
+        role: data.role,
+        mobile_number: data.mobile_number,
+        email: data.email,
+        ...data
+      }
+      login(userData)
+      console.log('✅ User updated in AuthContext:', userData)
+    } catch (err) {
+      console.error('❌ Profile Fetch Error:', err)
+    }
+  }
 
   const toggleDarkMode = () => {
     const newMode = !isDark
@@ -25,6 +83,60 @@ export function PatientLayout({ children, title, subtitle, showSidebar = true })
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
+    }
+  }
+
+  const handleLogout = async () => {
+    const confirmLogout = confirm('Are you sure you want to logout?')
+    if (!confirmLogout) return
+
+    try {
+      console.log('🚪 Logging out user...')
+      const accessToken = localStorage.getItem('accessToken')
+      
+      if (!accessToken) {
+        console.log('⚠️ No access token found')
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        localStorage.removeItem('user')
+        localStorage.removeItem('isAuthenticated')
+        route('/')
+        return
+      }
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/'
+      const apiUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'
+
+      const response = await fetch(`${apiUrl}auth/logout/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      })
+
+      console.log('📥 Logout Response Status:', response.status)
+
+      // Clear localStorage regardless of response
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('pendingUserId')
+      localStorage.removeItem('pendingPhone')
+
+      console.log('✅ Logged out successfully!')
+      alert('✅ Logged out successfully!')
+      route('/')
+    } catch (err) {
+      console.error('❌ Logout Error:', err)
+      // Still clear localStorage even if API fails
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      alert('Logged out (with error)')
+      route('/')
     }
   }
 
@@ -154,14 +266,14 @@ export function PatientLayout({ children, title, subtitle, showSidebar = true })
               >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">
-                    {(user?.name || 'A').charAt(0).toUpperCase()}
+                    {((profileData?.first_name || user?.name || 'A').charAt(0) + (profileData?.last_name || user?.name || 'A').charAt(0)).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
                     <p className="font-semibold text-gray-900 dark:text-white truncate">
-                      {user?.first_name || 'Aayrin'}
+                      {profileData ? `${profileData.first_name} ${profileData.last_name}`.trim() : (user?.name || 'Patient')}
                     </p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                      Patient
+                      {profileData?.role || user?.role || 'Patient'}
                     </p>
                   </div>
                 </div>
@@ -251,7 +363,7 @@ export function PatientLayout({ children, title, subtitle, showSidebar = true })
 
                   {/* Logout */}
                   <button
-                    onClick={() => route('/')}
+                    onClick={handleLogout}
                     className="hidden sm:flex items-center gap-2 bg-gray-600 dark:bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

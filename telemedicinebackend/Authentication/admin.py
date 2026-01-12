@@ -102,13 +102,14 @@ class UserAdmin(BaseUserAdmin):
     
     # ------------------ DEFAULT FILTER: SHOW DOCTORS ONLY ----------------------
     def changelist_view(self, request, extra_context=None):
-        # If no role filter is applied, default to showing doctors
-        if 'role__exact' not in request.GET and 'role' not in request.GET:
+        # If no role filter is applied, show Doctor + Hospital by default
+        if 'role__exact' not in request.GET and 'role__in' not in request.GET and 'role' not in request.GET:
             q = request.GET.copy()
-            q['role__exact'] = 'doctor'
+            q.setlist('role__in', ['doctor', 'hospital'])
             request.GET = q
             request.META['QUERY_STRING'] = request.GET.urlencode()
         return super().changelist_view(request, extra_context=extra_context)
+
 
     # ------------------ FIELDSETS (EDIT USER PAGE) ----------------------
 
@@ -164,6 +165,7 @@ class UserAdmin(BaseUserAdmin):
                 "city",
                 "state",
                 "pincode",
+                "hospital_digital_stamp",
             ),
             "classes": ("collapse",),
         }),
@@ -221,49 +223,3 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
 
-@admin.register(OTP)
-class OTPAdmin(admin.ModelAdmin):
-
-    # ------------------ LIST PAGE CONFIG ----------------------
-    list_display = (
-        "id",
-        "user",
-        "otp",
-        "created_at",
-    )
-
-    list_filter = (
-        "created_at",
-        "user__role",
-    )
-
-    search_fields = (
-        "user__username",
-        "user__mobile_number",
-        "otp",
-    )
-
-    ordering = ("-created_at",)
-
-    readonly_fields = (
-        "user",
-        "otp",
-        "created_at",
-    )
-
-    # ------------------ DETAIL PAGE CONFIG ----------------------
-
-    fieldsets = (
-        (_("OTP Information"), {
-            "fields": (
-                "user",
-                "otp",
-            )
-        }),
-
-        (_("Timestamp"), {
-            "fields": (
-                "created_at",
-            )
-        }),
-    )

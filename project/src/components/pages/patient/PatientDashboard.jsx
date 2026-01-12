@@ -167,7 +167,9 @@ export function PatientDashboard() {
 
   // Get display data from profileData or user context
   const displayUser = profileData || user || {}
-  const displayName = displayUser.first_name || 'Patient'
+  const displayName = profileData 
+    ? `${profileData.first_name} ${profileData.last_name}`.trim() 
+    : (user?.name || 'Patient')
   const displayMobileNumber = profileData?.mobile_number || user?.mobile_number || 'N/A'
   const displayRole = profileData?.role || user?.role || 'patient'
 
@@ -213,7 +215,10 @@ export function PatientDashboard() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold text-lg">
-                  {(displayName || 'A').charAt(0).toUpperCase()}
+                  {profileData 
+                    ? (profileData.first_name?.charAt(0) + profileData.last_name?.charAt(0)).toUpperCase()
+                    : (displayName || 'A').charAt(0).toUpperCase()
+                  }
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className="font-semibold text-gray-900 dark:text-white truncate">

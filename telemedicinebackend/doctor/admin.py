@@ -2,7 +2,6 @@ from django.contrib import admin
 from .models import (
 
     IndividualDoctorSchedule,
-    IndividualDoctorFee
 )
 
 @admin.register(IndividualDoctorSchedule)
@@ -11,7 +10,3 @@ class IndividualDoctorScheduleAdmin(admin.ModelAdmin):
     list_filter = ("day",)
 
 
-
-@admin.register(IndividualDoctorFee)
-class IndividualDoctorFeeAdmin(admin.ModelAdmin):
-    list_display = ("doctor", "amount")

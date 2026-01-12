@@ -62,7 +62,7 @@ def delete_otp_from_redis(user_id):
     key = f"otp:{user_id}"
     redis_client.delete(key)
 
-def send_otp_twilio(otp, phone):
+def send_otp_twilio(otp, mobile_number):
     """
     DEV MODE:
     OTP hamesha verified number par jayega
@@ -71,11 +71,14 @@ def send_otp_twilio(otp, phone):
         settings.TWILIO_ACCOUNT_SID,
         settings.TWILIO_AUTH_TOKEN
     )
+    
+    if not mobile_number.startswith("+"):
+        mobile_number = "+91" + mobile_number
 
     message = client.messages.create(
         body=f"Your login OTP is {otp}",
         from_=settings.TWILIO_PHONE_NUMBER,
-        to=phone # 👈 VERIFIED NUMBER ONLY
+        to=mobile_number # 👈 VERIFIED NUMBER ONLY
     )
 
     return message.sid

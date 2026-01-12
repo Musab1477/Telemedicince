@@ -57,7 +57,7 @@ def login_user(request):
 
     # 🔑 Generate OTP and store in Redis
     otp_code = generate_otp()
-    print("Generated OTP:", otp_code)  # Debugging line
+    print(otp_code)
     store_otp_in_redis(user.id, otp_code)
     mobile_number = "+91" + mobile_number  # Assuming country code +91
     print(f"Generated OTP for user {user.id}: {otp_code}")  # Debugging line
@@ -128,6 +128,7 @@ def verify_otp_and_login(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def logout_user(request):
     """
     Function-based logout API - destroys session
@@ -141,9 +142,11 @@ def profile_view(request):
     user = request.user
     return Response({
         "id": user.id,
-        "role": user.role,
         "first_name": user.first_name,
         "last_name": user.last_name,
+        "role": user.role,
+        "age": user.age,
+        "gender": user.gender,
         "mobile_number": user.mobile_number,
     })
 
@@ -265,9 +268,10 @@ def get_doctor_users(request):
     - Pagination
     """
 
+
     try:
         # 🔐 ROLE CHECK
-        if request.user.role not in ["admin", "hospital", "hospital-doctor","patient"]:
+        if request.user.role not in ["admin", "hospital", "hospital-doctor","patient", "doctor"]:
             return Response(
                 {"message": "You are not authorized to view doctors"},
                 status=status.HTTP_403_FORBIDDEN
@@ -383,16 +387,7 @@ def create_hospital_user(request):
 
         return Response(
             {
-                "message": "Hospital registered successfully",
-                "hospital": {
-                    "id": hospital.id,
-                    "hospital_name": hospital.hospital_name,
-                    "mobile_number": hospital.mobile_number,
-                    "email": hospital.email,
-                    "role": hospital.role,
-                },
-                # ⚠️ DEV MODE ONLY
-                "generated_password": generated_password,
+                "message": "You will recieve an email once your account is approved by admin",
             },
             status=status.HTTP_201_CREATED
         )
