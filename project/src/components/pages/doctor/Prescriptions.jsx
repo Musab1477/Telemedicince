@@ -188,7 +188,7 @@ export function Prescriptions() {
   const menuItems = [
     { icon: '🏠', label: 'Dashboard', onClick: () => route('/doctor/dashboard') },
     { icon: '📅', label: 'Schedule', onClick: () => route('/doctor/schedule') },
-    // { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
+    { icon: '📋', label: 'EMR', onClick: () => route('/doctor/emr') },
     { icon: '💊', label: 'Prescriptions', active: true, onClick: () => {} },
     { icon: '🎥', label: 'Consultations', onClick: () => route('/doctor/consultations') },
   ]
