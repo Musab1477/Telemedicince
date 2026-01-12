@@ -70,7 +70,7 @@ CSRF_COOKIE_SECURE = False
 # Application definition
 
 INSTALLED_APPS = [
-    'Authentication.apps.AuthenticationConfig',
+    'Authentication'
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -149,20 +149,26 @@ WSGI_APPLICATION = 'telemedicinebackend.wsgi.application'
 
 AUTH_USER_MODEL = 'Authentication.User'
 
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'telemedicine',    # database name
-        'USER': 'root',          # mysql user
-        'PASSWORD': 'Mus@b1477',  # mysql password
-        'HOST': 'localhost',
-        'PORT': '3306',
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'telemedicine',    # database name
+#         'USER': 'root',          # mysql user
+#         'PASSWORD': 'ayan@123',  # mysql password
+#         'HOST': 'localhost',
+#         'PORT': '3306',
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
+#         }
+#     }
+# }
 
 
 # Password validation
